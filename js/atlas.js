@@ -262,10 +262,12 @@
   const RISE = 3.2;
   function hills() {
     const tex = texWood(), base = new T.Color('#ffffff'), tip = new T.Color('#fff3c4');
+    const side = mix(C.hill, C.wood, 0.22);
     (D.hills || []).forEach((level, i) => {
       const g = new T.ExtrudeGeometry(shapes(level), { depth: RISE, bevelEnabled: false, curveSegments: 1 });
       const mat = fill(new T.MeshLambertMaterial({ map: tex, color: base.clone().lerp(tip, i / 11) }));
-      const m = new T.Mesh(up(g), mat);
+      const wall = fill(new T.MeshLambertMaterial({ color: side }));              // 側面不貼圖案，只用一個素色，免得圖案被拉扯
+      const m = new T.Mesh(up(g), [mat, wall]);
       m.position.y = 0.2 + i * RISE; m.castShadow = m.receiveShadow = true;
       scene.add(m);
       outline(level, 0.25 + (i + 1) * RISE, 0.6);
@@ -1030,8 +1032,7 @@
       scene.remove(o);
       o.traverse((n) => {
         if (n.geometry) n.geometry.dispose();
-        const m = n.material;
-        if (m) { if (m.map) m.map.dispose(); if (m.uniforms && m.uniforms.map) m.uniforms.map.value.dispose(); m.dispose(); }
+        [].concat(n.material || []).forEach((m) => { if (m.map) m.map.dispose(); if (m.uniforms && m.uniforms.map) m.uniforms.map.value.dispose(); m.dispose(); });   // 山有兩個材質（頂面、側面）
       });
     });
     slices.length = 0;
