@@ -18,16 +18,16 @@ window.ATLAS_STYLE = {
     sea: '#cfedf7',        // 水面的底色
     wave: '#39799d',       // 青海波的線
     // 綠地
-    hill: '#aad171',       // 山的底色
-    wood: '#64ad52',       // 山的圖案線條
+    hill: '#599a4c',       // 山的底色
+    wood: '#e7ffe0',       // 山的圖案線條
     lawn: '#c7d3a1',       // 草地的底色
     lawnLine: '#56b364',   // 草地的條紋
     // 道路
-    major: '#dc8679',      // 大馬路
+    major: '#ce7b6f',      // 大馬路
     minor: '#e9ad9f',      // 街道
     lane: '#e6c4b5',       // 巷道
     foot: '#f9d890',       // 步道
-    deck: '#b9655a',       // 高架橋的橋面
+    deck: '#c86c5f',       // 高架橋的橋面
     pier: '#d8ccb2',       // 橋墩、橋的側邊
     // 建築
     wall: '#ffe0e0',       // 一般建築
