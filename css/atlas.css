@@ -117,6 +117,7 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
 #src-close { position: absolute; right: 6px; top: 6px; width: 26px; height: 26px; font-size: 13px; }
 
 /* 調色（只在自己電腦上出現） */
+#set-now { margin-top: 8px; width: 100%; padding: 6px 0; font-size: 11px; font-weight: 700; letter-spacing: .1em; border: 1.5px solid var(--ink); }
 #set-edit[hidden] { display: none; }
 #set-reset { margin-top: 12px; width: 100%; padding: 7px 0; font-size: 12px; font-weight: 700; letter-spacing: .1em; border: 1.5px solid var(--ink); }
 #set-edit h2 { margin-top: 16px !important; padding-top: 12px; border-top: 1.5px solid var(--ink); }

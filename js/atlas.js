@@ -855,11 +855,12 @@
     const panel = document.getElementById('atlas-panel'), time = document.getElementById('set-time'), wx = document.getElementById('set-weather');
     setInterval(() => { if (!sky.manual) { sky.time = clockNow(); time.value = sky.time; applySky(); } }, 60000);   // 每分鐘對一次時
     const setBtn = document.getElementById('atlas-set');
-    setBtn.hidden = !EDIT;
+    setBtn.textContent = EDIT ? '編輯' : '時間・天氣';                          // 時間與天氣大家都能調；調色和 Render 只有自己電腦上才有
     setBtn.addEventListener('click', () => { panel.hidden = !panel.hidden; });
     document.getElementById('set-close').addEventListener('click', () => { panel.hidden = true; });
     time.value = sky.time;
     time.addEventListener('input', () => { sky.manual = true; sky.time = +time.value; applySky(); });
+    document.getElementById('set-now').addEventListener('click', () => { sky.manual = false; sky.time = clockNow(); time.value = sky.time; applySky(); });   // 回到現在的時刻
     Object.keys(WEATHER).forEach((k) => {
       const b = document.createElement('button');
       b.textContent = WEATHER[k].label; b.classList.toggle('on', k === sky.weather);
