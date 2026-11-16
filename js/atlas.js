@@ -788,28 +788,19 @@
     return t;
   }
 
-  // ---------- 街上的白模：汽車、公車、公車亭 ----------
+  // ---------- 街上的白模：公車亭 ----------
   const inAny = (p, list) => list.some((rings) => inside(p, rings[0]) && !rings.slice(1).some((r) => inside(p, r)));
   function traffic() {
     const k = kit(), F = (D.flows || {}).car || [], white = '#fcfbf7', grey = '#e4e5e3';
     const road = (p) => inAny(p, D.major) || inAny(p, D.minor) || inAny(p, D.lane);
     const built = (p) => D.buildings.some((b) => inside(p, b.p));
-    const car = (x, y, a) => { k.tone(white); k.box(x, y, a, 4, 1.7, 0.5, 1.9); k.tone(grey); k.box(x - Math.cos(a) * 0.5, y - Math.sin(a) * 0.5, a, 2.2, 1.5, 1.9, 3); };
-    const bus = (x, y, a) => { k.tone(white); k.box(x, y, a, 8, 1.9, 0.6, 4.4); k.tone(grey); k.box(x, y, a, 7.4, 1.95, 2.2, 3.5); k.tone(white); k.box(x - Math.cos(a) * 2, y - Math.sin(a) * 2, a, 2, 1.1, 4.4, 4.8); };
     const stops = [];
-    let n = 0;
     F.forEach((l) => {
       const w = l[0], q = l[1];
       if (w < 1.4) return;
-      let next = 10 + rnd() * 40, stopAt = 60 + rnd() * 80;
+      let stopAt = 60 + rnd() * 80;
       for (let i = 0; i + 3 < q.length; i += 2) {
         const dx = q[i + 2] - q[i], dy = q[i + 3] - q[i + 1], len = Math.hypot(dx, dy) || 1, ux = dx / len, uy = dy / len, a = Math.atan2(dy, dx);
-        for (; next < len; next += (w >= 2.4 ? 26 : 60) + rnd() * 70) {
-          const side = (rnd() < 0.5 ? -1 : 1) * (w >= 2.4 ? 2 + rnd() * 5 : 1.9), x = q[i] + ux * next + uy * side, y = q[i + 1] + uy * next - ux * side;
-          if (Math.abs(x) > HW - 6 || Math.abs(y) > HH - 6 || !road({ x, y }) || built({ x, y })) continue;
-          if (w >= 2.4 && ++n % 11 === 0) bus(x, y, side > 0 ? a : a + Math.PI); else car(x, y, side > 0 ? a : a + Math.PI);
-        }
-        next -= len;
         if (w >= 2.4) {
           for (; stopAt < len; stopAt += 170 + rnd() * 60) {                     // 往右找到路緣，公車亭放在人行道上
             const px = q[i] + ux * stopAt, py = q[i + 1] + uy * stopAt;
@@ -822,7 +813,6 @@
             k.tone(white); [-4, 4].forEach((e) => k.box(x + ux * e - uy * 1.2, y + uy * e + ux * 1.2, a, 0.14, 0.14, 0.5, 3.4));   // 前柱
             k.box(x + uy * 0.5, y - ux * 0.5, a, 2.6, 0.4, 0.5, 1.15);                                            // 長椅
             k.box(x + ux * 6 - uy * 1, y + uy * 6 + ux * 1, a, 0.13, 0.13, 0.5, 4.6); k.tone(C.key2); k.box(x + ux * 6 - uy * 1, y + uy * 6 + ux * 1, a, 0.7, 0.16, 3.7, 4.7);   // 站牌
-            if (stops.length % 2) bus(px + uy * (d - 2.6), py - ux * (d - 2.6), a);                               // 有幾站剛好有車靠站
           }
           stopAt -= len;
         }

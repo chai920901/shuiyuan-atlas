@@ -13,12 +13,13 @@ window.ATLAS_STYLE = {
     // 底圖
     paper: '#fbdfdf',      // 紙底（空地的顏色）
     slab: '#cdbd9c',       // 底座側邊
-    ink: '#92592f',        // 墨線、路名
+    ink: '#a45c28',        // 墨線、路名
     // 水
     sea: '#cfedf7',        // 水面的底色
     wave: '#39799d',       // 青海波的線
     // 綠地
-    wood: '#54875f',       // 山的圖案線條（山的底色沒另外設 hill 時，會由這一色調淡）
+    hill: '#aad171',       // 山的底色
+    wood: '#64ad52',       // 山的圖案線條
     lawn: '#c7d3a1',       // 草地的底色
     lawnLine: '#56b364',   // 草地的條紋
     // 道路
@@ -29,14 +30,14 @@ window.ATLAS_STYLE = {
     deck: '#b9655a',       // 高架橋的橋面
     pier: '#d8ccb2',       // 橋墩、橋的側邊
     // 建築
-    wall: '#f3e8cb',       // 一般建築
-    tint: '#d81b72',       // 市場周邊的房子（會自動調淡，越靠近市場越濃）。只影響周邊房子，不會動到市場主體
-    key2: '#eab448',       // 地標建築、一般天橋
+    wall: '#ffe0e0',       // 一般建築
+    tint: '#ffe0e0',       // 市場周邊的房子（會自動調淡，越靠近市場越濃）。只影響周邊房子，不會動到市場主體
+    key2: '#ffb92e',       // 地標建築、一般天橋
     // 水源市場主體（只有主體用這三色）
     heroBlue: '#1a44c8',   // 深藍：塔樓、柱子
     heroSky: '#2f8fe6',    // 淺藍：樓身、天橋欄杆
-    heroPink: '#d81b72',   // 杜鵑：格子、色塊、人流與步行圈
+    heroPink: '#ec3cb4',   // 杜鵑：格子、色塊、人流與步行圈
   },
-  hillPattern: 'wave',     // 山的圖案：wave 波紋、paver 斜格、loops 草圈、stripes 橫條
+  hillPattern: 'loops',     // 山的圖案：wave 波紋、paver 斜格、loops 草圈、stripes 橫條
   weather: 'sun',          // 天氣：sun 晴、cloud 多雲、grey 陰、rain 雨
 };
