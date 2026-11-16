@@ -776,7 +776,7 @@
 
   // ---------- 圖名與文字開關：按 Esc 把所有字藏起來，再按一次叫回來 ----------
   function legend() {
-    document.getElementById('atlas-home').addEventListener('click', () => { fit = fitSize(); view.az = ((view.az - HOME.az + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI + HOME.az; fly({ az: HOME.az, el: HOME.el, size: fit, tx: 0, tz: 0 }); });
+    document.getElementById('atlas-home').addEventListener('click', () => { if (survey) setSurvey(false, true); fit = fitSize(); view.az = ((view.az - HOME.az + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI + HOME.az; fly({ az: HOME.az, el: HOME.el, size: fit, tx: 0, tz: 0, ty: 0 }); });
     document.getElementById('atlas-render').addEventListener('click', (e) => shot(e.shiftKey));
     document.getElementById('shot-close').addEventListener('click', () => { document.getElementById('atlas-shot').hidden = true; });
     const bar = document.getElementById('atlas-lens');
@@ -787,7 +787,7 @@
       bar.appendChild(b);
     });
     document.getElementById('atlas-turn').addEventListener('click', () => fly({ az: view.az + Math.PI / 2 }));
-    document.getElementById('atlas-top').addEventListener('click', () => fly({ el: view.el > 1.2 ? HOME.el : 1.5 }));
+    document.getElementById('atlas-top').addEventListener('click', () => fly({ el: view.el > 1.2 ? (survey ? 0.6155 : HOME.el) : 1.5 }));
     document.getElementById('atlas-name').textContent = S.name.zh;
     document.getElementById('atlas-name-en').textContent = S.name.en;
     document.getElementById('atlas-sub').textContent = S.sub.zh;
@@ -796,6 +796,8 @@
       if (e.key !== 'Escape') return;
       const box = document.getElementById('atlas-shot');
       if (!box.hidden) { box.hidden = true; return; }
+      const open = ['atlas-panel', 'atlas-sources'].map((id) => document.getElementById(id)).filter((el) => !el.hidden);
+      if (open.length) { open.forEach((el) => { el.hidden = true; }); return; }   // 有面板開著：Esc 先關面板
       if (survey) { setSurvey(false); return; }                               // 測繪圖開著時，Esc 先回到地圖                         // 輸出預覽開著時，Esc 先關掉它
       bare = stage.classList.toggle('bare');
       setMode(mode);
@@ -835,7 +837,7 @@
     else { top = mix(top, '#ffdcb4', low); bottom = mix(bottom, '#f0a184', low); }
     skyTop = top;
     stage.style.background = survey ? '' : 'radial-gradient(120% 90% at 50% 40%, ' + top + ' 0%, ' + bottom + ' 100%)';
-    stage.classList.toggle('night', !day);
+    stage.classList.toggle('night', !day && !survey);
     stage.dataset.weather = sky.weather;
     const orb = document.getElementById(day ? 'sky-sun' : 'sky-moon'), other = document.getElementById(day ? 'sky-moon' : 'sky-sun');
     other.style.opacity = 0; orb.style.opacity = 1;
@@ -948,8 +950,8 @@
   }
   let before = null;
   const base = [];                                                              // 測繪圖底下的那塊底板
-  function setSurvey(on) {
-    if (on === survey || !slices.length) return;
+  function setSurvey(on, stay) {                                                // stay：離開時鏡頭不要飛回進來前的位置（呼叫的人自己會決定去哪）
+    if (on === survey || !slices.length || grow < 1) return;
     survey = on;
     const hero = S.notes.find((n) => n.mark === 'main'), keep = slices.map((sl) => sl.g).concat(skyHolder ? [skyHolder] : []);
     scene.children.forEach((o) => { if (!o.isLight && o !== sun.target && o !== town) o.visible = !on; });
@@ -968,7 +970,8 @@
       setMode(mode, lens);
       document.getElementById('survey-tags').classList.remove('on');
       floorAt = -1; markFloor();
-      if (before) fly(before);
+      if (before && !stay) fly(before); else if (stay) fly({ ty: 0 });
+      before = null;
     }
     applySky();
   }
@@ -1170,7 +1173,7 @@
     renderer.setSize(w, h, false);
     const el = Math.max(0.28, Math.min(1.5, view.el));
     view.el = el;
-    view.size = Math.max(45, Math.min(fit * 1.5, view.size));
+    view.size = Math.max(survey ? 30 : 45, Math.min(survey ? 150 : fit * 1.5, view.size));   // 測繪圖裡不讓人拉得太遠，字才不會全擠在一起
     view.tx = Math.max(-HW, Math.min(HW, view.tx)); view.tz = Math.max(-HH, Math.min(HH, view.tz));
     camera.left = -view.size * asp; camera.right = view.size * asp; camera.top = view.size; camera.bottom = -view.size;
     camera.position.set(view.tx + Math.sin(view.az) * Math.cos(el) * 2600, Math.sin(el) * 2600, view.tz + Math.cos(view.az) * Math.cos(el) * 2600);
