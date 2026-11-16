@@ -12,7 +12,7 @@ window.ATLAS_SITE = {
   // crowd：人流分析裡這個點會聚集多少人（相對值，是推估不是實測）。
   notes: [
     { zh: '水源市場', en: 'Shuiyuan Market', lat: 25.01353, lng: 121.53506, mark: 'main', crowd: 1.2 },
-    { zh: '公館站', en: 'MRT Gongguan', lat: 25.01435, lng: 121.53432, crowd: 1 },
+    { zh: '公館站', en: 'MRT Gongguan', lat: 25.014437, lng: 121.53442, crowd: 1 },   // 一號出口旁的人行道上
     { zh: '水源里辦公處', en: 'Shuiyuan Village Office', lat: 25.014546, lng: 121.533706 },
     { zh: '新店溪', en: 'Xindian River', lat: 25.00965, lng: 121.53010 },
     { zh: '寶藏巖', en: 'Treasure Hill', lat: 25.01055, lng: 121.53330, mark: true, crowd: 0.5 },

@@ -86,18 +86,6 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
 #set-weather button { flex: 1; padding: 6px 0; font-size: 12px; font-weight: 700; border: 1.5px solid var(--ink); }
 #set-weather button.on { background: var(--ink); color: var(--paper); }
 
-/* 樓層介紹 */
-#atlas-floors { position: absolute; left: max(16px, env(safe-area-inset-left)); top: 0; bottom: 0; z-index: 3;
-  display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 4px; pointer-events: none; }
-#atlas-floors[hidden] { display: none; }
-#atlas-floors > * { pointer-events: auto; }
-#floor-list { display: flex; flex-direction: column; gap: 4px; }
-#floor-list button { min-width: 52px; padding: 5px 10px; font: 700 12px/1.3 "DM Mono", "Noto Sans TC", monospace; letter-spacing: .06em;
-  background: var(--paper); border: 1.5px solid var(--ink); }
-#floor-list button.on { background: var(--red); color: #fff7ea; }
-#floor-close { width: 28px; height: 28px; margin-bottom: 4px; font-size: 13px; background: var(--paper); border: 1.5px solid var(--ink); }
-#atlas.bare #atlas-floors { display: none; }
-
 /* 測繪圖：乾淨的紙色背景，其他介面收起來；每層一條黑線 */
 #atlas.survey { background: #f8f5ee; }
 #atlas.survey #atlas-sky, #atlas.survey #atlas-rain, #atlas.survey #atlas-tags, #atlas.survey #atlas-lens, #atlas.survey #lens-note { display: none; }

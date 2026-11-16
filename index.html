@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/atlas.css">
+  <link rel="stylesheet" href="css/atlas.css?v=7">
 </head>
 <body>
 
@@ -82,11 +82,7 @@
       </div>
     </aside>
 
-    <!-- 測繪圖：左邊一排樓層，圖上每一層拉一條黑線寫用途 -->
-    <aside id="atlas-floors" hidden>
-      <button id="floor-close" aria-label="回到地圖">✕</button>
-      <nav id="floor-list"></nav>
-    </aside>
+    <!-- 測繪圖：圖上每一層拉一條黑線寫用途，點文字可以展開那一層 -->
     <div id="survey-tags"></div>
 
     <!-- 資料來源 -->
@@ -107,6 +103,6 @@
   <script src="data/atlas.js"></script>
   <!-- 這兩個檔案常改，加上時間戳記，免得瀏覽器拿到舊的 -->
   <script>document.write('<script src="data/site.js?t=' + Date.now() + '"><\/script><script src="data/style.js?t=' + Date.now() + '"><\/script>');</script>
-  <script src="js/atlas.js"></script>
+  <script src="js/atlas.js?v=7"></script>
 </body>
 </html>

@@ -958,7 +958,6 @@
     town.children.forEach((o) => { o.visible = !on || keep.includes(o); });
     base.forEach((o) => { o.visible = on; });
     stage.classList.toggle('survey', on);
-    document.getElementById('atlas-floors').hidden = !on;
     document.getElementById('atlas-floor-btn').textContent = on ? '回到地圖' : '樓層測繪圖';
     if (on) {
       before = { tx: view.tx, tz: view.tz, ty: 0, size: view.size, az: view.az, el: view.el };
@@ -976,19 +975,14 @@
     applySky();
   }
   function markFloor() {
-    [...document.getElementById('floor-list').children].forEach((b) => b.classList.toggle('on', +b.dataset.i === floorAt));
     [...document.getElementById('survey-tags').children].forEach((b) => b.classList.toggle('pick', +b.dataset.i === floorAt));
   }
   function setFloor(i) { floorAt = i === floorAt ? -1 : i; markFloor(); dirty = true; }
   const leaders = [];
   function floorsUi() {
-    const list = document.getElementById('floor-list'), tagBox = document.getElementById('survey-tags'), hero = S.notes.find((n) => n.mark === 'main');
+    const tagBox = document.getElementById('survey-tags'), hero = S.notes.find((n) => n.mark === 'main');
     if (!FLOORS.length || !hero) { document.getElementById('atlas-floor-btn').hidden = true; return; }
     const rows = FLOORS.map((f, i) => ({ i, id: f.id, name: f.name, text: f.text })).concat([{ i: FLOORS.length, id: 'RF', name: '屋頂', text: S.roofText || '機房、水塔、太陽能板。' }]);
-    rows.slice().reverse().forEach((r) => {                                    // 高樓層在上面
-      const b = document.createElement('button');
-      b.textContent = r.id; b.dataset.i = r.i; b.addEventListener('click', () => setFloor(r.i)); list.appendChild(b);
-    });
     rows.forEach((r) => {                                                      // 每層一條黑線加說明
       const el = document.createElement('button');
       el.className = 'leader'; el.dataset.i = r.i; el.style.setProperty('--wait', r.i * 0.05 + 's');
@@ -997,7 +991,6 @@
       tagBox.appendChild(el); leaders.push(el);
     });
     document.getElementById('atlas-floor-btn').addEventListener('click', () => setSurvey(!survey));
-    document.getElementById('floor-close').addEventListener('click', () => setSurvey(false));
   }
   function placeLeaders() {                                                     // 黑線的起點：這一層在畫面上最靠右的那個角
     if (!survey || !heroRing) return;
