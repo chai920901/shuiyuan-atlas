@@ -327,6 +327,7 @@
     return new T.Mesh(g, fill(new T.MeshLambertMaterial({ map: texFacade(), side: T.DoubleSide })));
   }
 
+  if (S.hide) D.buildings = D.buildings.filter((b) => !S.hide.includes(b.n));       // 場域設定裡指定不畫的建築
   const FLOORS = S.floors || [];                                                // 主體的樓層（由下往上），高度以公尺計
   let town;
   function buildings() {
