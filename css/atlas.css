@@ -34,7 +34,6 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
 #atlas-tools button { padding: 8px 12px; font-size: 12px; font-weight: 700; letter-spacing: .14em; background: var(--paper);
   border: 1.5px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); }
 #atlas-tools button:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
-#atlas-render { background: var(--red) !important; color: #fff7ea; font-family: "DM Mono", monospace; text-transform: uppercase; }
 
 /* 下方：作品清單 */
 #atlas-foot { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 0 max(10px, env(safe-area-inset-bottom)); pointer-events: none; }
@@ -95,12 +94,14 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
 .leader { position: absolute; left: 0; top: 0; pointer-events: auto; text-align: left; }
 .leader i { position: absolute; left: 4px; top: 0; height: 0; width: 0; border-top: 1.5px solid #111; transition: width .5s ease var(--wait, 0s); }
 .leader i::before { content: ""; position: absolute; left: -4px; top: -4px; width: 6px; height: 6px; border-radius: 50%; background: #111; }
-.leader span { position: absolute; left: clamp(40px, 9vw, 110px); bottom: -9px; width: max-content; max-width: min(240px, 42vw); padding-left: 8px;
+.leader span { position: absolute; left: clamp(40px, 9vw, 110px); bottom: -9px; width: max-content; max-width: min(240px, var(--room, 240px)); padding-left: 8px;
   opacity: 0; transition: opacity .4s ease calc(var(--wait, 0s) + .35s); color: #111; }
 .leader b { display: block; font-size: 12px; font-weight: 900; letter-spacing: .06em; line-height: 1.5; white-space: nowrap; }
 .leader em { display: none; font-style: normal; font-size: 11px; line-height: 1.6; }
 #survey-tags.on .leader i { width: clamp(36px, 9vw, 106px); }
 #survey-tags.on .leader span { opacity: 1; }
+.leader.pick { z-index: 2; }
+.leader.pick span { padding: 5px 8px; background: rgba(248, 245, 238, .95); border-left: 2.5px solid #111; }   /* 選中的那一層墊一塊底，蓋到別的標籤時還看得清楚 */
 .leader.pick b { color: var(--red); font-size: 14px; }
 .leader.pick em { display: block; }
 .leader.pick i { border-top-width: 2.5px; }
@@ -117,6 +118,7 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
 
 /* 調色（只在自己電腦上出現） */
 #set-edit[hidden] { display: none; }
+#set-reset { margin-top: 12px; width: 100%; padding: 7px 0; font-size: 12px; font-weight: 700; letter-spacing: .1em; border: 1.5px solid var(--ink); }
 #set-edit h2 { margin-top: 16px !important; padding-top: 12px; border-top: 1.5px solid var(--ink); }
 #set-colors { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
 #set-colors label { display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 500; cursor: pointer; }
@@ -138,7 +140,40 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
 /* 按 Esc：只留下圖 */
 #atlas.bare #atlas-tags, #atlas.bare #atlas-head, #atlas.bare #atlas-tools, #atlas.bare #atlas-panel, #atlas.bare #atlas-foot { display: none; }
 
-@media (max-width: 720px) { #atlas-meta span:first-child { display: none; } }
+#atlas-render { display: block; width: 100%; padding: 8px 0; font: 700 12px/1.2 "DM Mono", "Noto Sans TC", monospace; letter-spacing: .1em;
+  background: var(--red); color: #fff7ea; border: 1.5px solid var(--ink); }
+#atlas-set[hidden] { display: none; }
+.hint-touch { display: none; }
+
+/* 手機與觸控：按鈕縮小、圖名縮小、說明換成手勢的版本 */
+@media (hover: none), (max-width: 720px) {
+  .hint-key { display: none; }
+  .hint-touch { display: inline; }
+  #atlas-count { display: none; }
+}
+@media (max-width: 720px) {
+  #atlas-head { left: 12px; top: max(10px, env(safe-area-inset-top)); }
+  #atlas-name { font-size: 30px; margin: 4px 0 0; }
+  #atlas-name-en { font-size: 9px; }
+  #atlas-place { font-size: 9px; }
+  #atlas-sub { margin-top: 6px !important; padding: 3px 7px; font-size: 10px; }
+  #atlas-tools { right: 10px; top: max(10px, env(safe-area-inset-top)); gap: 7px; }
+  #atlas-tools button { padding: 7px 9px; font-size: 11px; letter-spacing: .08em; box-shadow: 2px 2px 0 var(--ink); }
+  #atlas-lens { gap: 6px; padding: 4px 12px 6px; }
+  #atlas-lens button { padding: 8px 12px; font-size: 12px; letter-spacing: .06em; }
+  #lens-note { margin: 0 12px 4px; font-size: 11px; padding: 7px 10px; }
+  #atlas-meta { padding: 0 12px; font-size: 9px; }
+  #atlas-panel { right: 10px; top: 54px; width: min(250px, calc(100vw - 20px)); }
+  #atlas-sources { right: 10px; bottom: 64px; }
+  #atlas-sky svg { width: 54px; }
+  .leader b { font-size: 11px; }
+  .leader.pick b { font-size: 12px; }
+  .leader em { font-size: 10px; }
+  .leader span { left: 30px; }
+  .leader b { white-space: normal; }
+  #survey-tags.on .leader i { width: 28px; }
+}
+
 @media (max-width: 560px) {
   .note span { font-size: 8px; } .note span b { font-size: 10px; }
 }

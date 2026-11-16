@@ -20,7 +20,8 @@
   const STYLE = window.ATLAS_STYLE || {};
   const LIVE = Object.assign({}, BASE, STYLE.palette || {});
   const C = Object.assign({}, LIVE);
-  const EDIT = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);         // 調色面板只在自己電腦上預覽時出現，發布出去的網站沒有
+  // 私下編輯：直接在自己電腦上打開 index.html（或用 localhost 預覽）時才成立。發布到網路上的版本沒有調色、Render、時間天氣這些工具
+  const EDIT = location.protocol === 'file:' || /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
   if (EDIT) { try { Object.assign(C, JSON.parse(localStorage.getItem(STORE) || '{}')); } catch (e) { /* 讀不到就用檔案裡的 */ } }
   const mix = (a, b, k) => '#' + new THREE.Color(a).lerp(new THREE.Color(b), k).getHexString();
   function derive() {                                                           // 由主色推出深淺變化
@@ -777,7 +778,6 @@
   // ---------- 圖名與文字開關：按 Esc 把所有字藏起來，再按一次叫回來 ----------
   function legend() {
     document.getElementById('atlas-home').addEventListener('click', () => { if (survey) setSurvey(false, true); fit = fitSize(); view.az = ((view.az - HOME.az + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI + HOME.az; fly({ az: HOME.az, el: HOME.el, size: fit, tx: 0, tz: 0, ty: 0 }); });
-    document.getElementById('atlas-render').addEventListener('click', (e) => shot(e.shiftKey));
     document.getElementById('shot-close').addEventListener('click', () => { document.getElementById('atlas-shot').hidden = true; });
     const bar = document.getElementById('atlas-lens');
     Object.keys(LENS).forEach((k) => {
@@ -786,7 +786,6 @@
       b.addEventListener('click', () => setMode('a', k));
       bar.appendChild(b);
     });
-    document.getElementById('atlas-turn').addEventListener('click', () => fly({ az: view.az + Math.PI / 2 }));
     document.getElementById('atlas-top').addEventListener('click', () => fly({ el: view.el > 1.2 ? (survey ? 0.6155 : HOME.el) : 1.5 }));
     document.getElementById('atlas-name').textContent = S.name.zh;
     document.getElementById('atlas-name-en').textContent = S.name.en;
@@ -806,7 +805,8 @@
 
   // ---------- 輸出：把現在的角度畫成一張大圖存下來（最長邊 4096）。按住 Shift 再按，背景是透明的 ----------
   // ---------- 時間與天氣：決定光從哪裡來、影子多深、天空什麼顏色，還有太陽和月亮在哪裡 ----------
-  const sky = { time: STYLE.time == null ? 15.5 : STYLE.time, weather: STYLE.weather || 'sun' };
+  const clockNow = () => { const d = new Date(); return d.getHours() + d.getMinutes() / 60; };
+  const sky = { time: clockNow(), weather: STYLE.weather || 'sun', manual: false };   // 時間跟著看的人當下的時刻走；manual 是編輯時手動拉過時間軸
   const WEATHER = { sun: { label: '晴', cut: 0.4, dim: 1 }, cloud: { label: '多雲', cut: 0.26, dim: 1 }, grey: { label: '陰', cut: 0.1, dim: 0.97 }, rain: { label: '雨', cut: 0.06, dim: 0.92 } };
   const amb = new T.AmbientLight(0xffffff, 0.6), sun = new T.DirectionalLight(0xffffff, 0.5), tint = new T.Color();
   let skyTop = BASE.paper;
@@ -819,14 +819,14 @@
     const up = sun.position.y;
     sun.position.multiplyScalar(1500);
     // 朝上的面（地面、屋頂）收到的光永遠加總成 dim，顏色不會因為太陽低就整片變暗；影子的深淺是 cut
-    const cut = day ? w.cut : w.cut * 0.55, dim = day ? w.dim : 0.86;
+    const cut = day ? w.cut : w.cut * 0.55, dim = day ? w.dim : 0.96;
     sun.intensity = Math.min(0.72, cut / up);
     amb.intensity = dim - sun.intensity * up;
     if (day) {
       sun.color.set('#ffffff').lerp(tint.set('#ffb070'), low * 0.7);
       amb.color.set(dull ? '#e6ebf2' : '#ffffff').lerp(tint.set('#ffe2c4'), low * 0.45);
     } else {
-      sun.color.set('#c9d3ff'); amb.color.set('#a9b6f2');
+      sun.color.set('#dfe5ff'); amb.color.set('#c9d2f6');                     // 晚上：淡淡的藍，但顏色還看得清楚
     }
     const reach = Math.min(2.4, Math.hypot(LIGHT.x, LIGHT.z) / Math.abs(LIGHT.y)), len = Math.hypot(LIGHT.x, LIGHT.z) || 1;
     blobs.forEach((b) => { b.mesh.position.set((LIGHT.x / len) * reach * b.k, 0, (LIGHT.z / len) * reach * b.k); b.mesh.material.opacity = 0.08 + w.cut * 0.45; });
@@ -853,10 +853,13 @@
   // ---------- 設定面板：時間與天氣 ----------
   function settings() {
     const panel = document.getElementById('atlas-panel'), time = document.getElementById('set-time'), wx = document.getElementById('set-weather');
-    document.getElementById('atlas-set').addEventListener('click', () => { panel.hidden = !panel.hidden; });
+    setInterval(() => { if (!sky.manual) { sky.time = clockNow(); time.value = sky.time; applySky(); } }, 60000);   // 每分鐘對一次時
+    const setBtn = document.getElementById('atlas-set');
+    setBtn.hidden = !EDIT;
+    setBtn.addEventListener('click', () => { panel.hidden = !panel.hidden; });
     document.getElementById('set-close').addEventListener('click', () => { panel.hidden = true; });
     time.value = sky.time;
-    time.addEventListener('input', () => { sky.time = +time.value; applySky(); });
+    time.addEventListener('input', () => { sky.manual = true; sky.time = +time.value; applySky(); });
     Object.keys(WEATHER).forEach((k) => {
       const b = document.createElement('button');
       b.textContent = WEATHER[k].label; b.classList.toggle('on', k === sky.weather);
@@ -874,14 +877,16 @@
     document.getElementById('atlas-src').addEventListener('click', () => { src.hidden = !src.hidden; });
     document.getElementById('src-close').addEventListener('click', () => { src.hidden = true; });
     // 調色
-    if (!EDIT) return;                                                         // 發布出去的網站到這裡為止，沒有調色的介面
-    panel.insertAdjacentHTML('beforeend', '<div id="set-edit"><h2>顏色</h2><div id="set-colors"></div><button id="set-reset">回到檔案裡的顏色</button>' +
+    if (!EDIT) return;                                                         // 發布出去的網站到這裡為止，沒有調色與輸出的介面
+    panel.insertAdjacentHTML('beforeend', '<div id="set-edit"><h2>輸出</h2><button id="atlas-render" title="把現在的角度存成 PNG；按住 Shift 再按，背景透明">Render 存成 PNG</button>' +
+      '<p class="set-tip">存的是現在畫面的角度。按住 Shift 再按，背景是透明的。</p><h2>顏色</h2><div id="set-colors"></div><button id="set-reset">回到檔案裡的顏色</button>' +
       '<p class="set-tip">這一區只有在自己電腦上預覽時才會出現。調好之後跟 Claude 說「存顏色」，或按下面的按鈕複製，貼到 data/style.js 蓋掉原本的內容再上傳。</p>' +
       '<button id="set-copy">複製 style.js 的內容</button><textarea id="set-out" rows="5" readonly></textarea></div>');
     const list = document.getElementById('set-colors'), out = document.getElementById('set-out');
+    document.getElementById('atlas-render').addEventListener('click', (e) => shot(e.shiftKey));
     const text = () => {
       const lines = PALETTE.concat([['slab', '底座側邊'], ['pier', '橋墩']]).map(([k, label]) => "    " + k + ": '" + C[k] + "',".padEnd(22) + '// ' + label);
-      return '// 網站的顏色、預設的時間與天氣。由頁面上的調色面板產生。\nwindow.ATLAS_STYLE = {\n  palette: {\n' + lines.join('\n') + '\n  },\n  time: ' + sky.time + ',\n  weather: \'' + sky.weather + '\',\n};\n';
+      return '// 網站的顏色與天氣。由頁面上的調色面板產生。時間不用設定，網站會跟著看的人當下的時刻走。\nwindow.ATLAS_STYLE = {\n  palette: {\n' + lines.join('\n') + '\n  },\n  weather: \'' + sky.weather + '\',\n};\n';
     };
     let wait = null;
     const inputs = {}, store = () => {
@@ -951,7 +956,8 @@
   let before = null;
   const base = [];                                                              // 測繪圖底下的那塊底板
   function setSurvey(on, stay) {                                                // stay：離開時鏡頭不要飛回進來前的位置（呼叫的人自己會決定去哪）
-    if (on === survey || !slices.length || grow < 1) return;
+    if (on === survey || !slices.length) return;
+    if (grow < 1) { grow = 1; town.scale.y = 1; growers.forEach((m) => { m.uniforms.grow.value = 1; }); renderer.shadowMap.needsUpdate = true; }   // 開場動畫還沒跑完就點了：直接跳到結束
     survey = on;
     const hero = S.notes.find((n) => n.mark === 'main'), keep = slices.map((sl) => sl.g).concat(skyHolder ? [skyHolder] : []);
     scene.children.forEach((o) => { if (!o.isLight && o !== sun.target && o !== town) o.visible = !on; });
@@ -961,7 +967,7 @@
     document.getElementById('atlas-floor-btn').textContent = on ? '回到地圖' : '樓層測繪圖';
     if (on) {
       before = { tx: view.tx, tz: view.tz, ty: 0, size: view.size, az: view.az, el: view.el };
-      const asp = stage.clientWidth / stage.clientHeight, size = Math.max(84, 62 / asp), az = 1.75, shift = Math.min(size * asp * 0.3, 34);
+      const asp = stage.clientWidth / stage.clientHeight, size = Math.max(84, 62 / asp), az = 1.75, shift = Math.min(size * asp * (asp < 0.8 ? 0.5 : 0.3), 34);   // 把主體往左放，右邊留給引線的字；直式畫面要讓得更多
       view.az = ((view.az - az + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI + az;
       fly({ tx: hero.at.x + Math.cos(az) * shift, tz: -hero.at.y - Math.sin(az) * shift, ty: 52, size, az, el: 0.6155 });   // 等角：俯角 35.26 度
       setTimeout(() => { if (survey) document.getElementById('survey-tags').classList.add('on'); }, 500);
@@ -1001,6 +1007,7 @@
       let bx = -1e9, by = 0;
       heroRing.forEach((q) => { v.set(q[0], sl.mid + sl.at, -q[1]).project(camera); const x = (v.x + 1) / 2 * w; if (x > bx) { bx = x; by = (1 - v.y) / 2 * h; } });
       el.style.transform = 'translate(' + bx.toFixed(1) + 'px,' + by.toFixed(1) + 'px)';
+      el.style.setProperty('--room', Math.max(64, w - bx - (w < 720 ? 44 : 130)) + 'px');   // 字最多可以多寬，才不會跑出畫面
     });
   }
   function surveyBase() {                                                       // 測繪圖用的底板：一個圓盤加一圈墨線
@@ -1283,13 +1290,18 @@
     const sc = sun.shadow.camera, span = Math.hypot(HW, HH) + 80;
     sc.left = -span; sc.right = span; sc.top = span; sc.bottom = -span; sc.near = 100; sc.far = 3200;
     const cap = renderer.capabilities.maxTextureSize;
-    sun.shadow.mapSize.set(Math.min(4096, cap), Math.min(4096, cap));
+    const shade = Math.min(cap, Math.min(window.innerWidth, window.innerHeight) < 700 ? 2048 : 4096);   // 手機用小一點的陰影圖，比較不吃力
+    sun.shadow.mapSize.set(shade, shade);
     sun.shadow.bias = -0.0012;
     scene.add(amb, sun, sun.target);
 
     build(); markers(); legend(); controls(); settings(); floorsUi();
     fit = fitSize();
     view.size = fit;
+    const market = S.notes.find((n) => n.mark === 'main');
+    if (market && stage.clientWidth / stage.clientHeight < 0.8) {             // 直式的手機：一打開先看市場這一帶，整張圖太小了
+      view.size = fit * 0.5; view.tx = market.at.x; view.tz = -market.at.y;
+    }
     document.getElementById('atlas-count').textContent = D.buildings.length + ' 棟建築　' + D.trees.length + ' 棵樹　' + D.people.length + ' 個人';
     requestAnimationFrame(loop);
     window.ATLAS = { view, fly, setMode, setFloor, setSurvey, palette: () => PALETTE.reduce((o, [k]) => { o[k] = C[k]; return o; }, {}), sky, applySky, redraw: () => { dirty = true; } };          // 給主控台用：ATLAS.fly({ tx, tz, size, az, el })

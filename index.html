@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/atlas.css?v=7">
+  <link rel="stylesheet" href="css/atlas.css?v=8">
 </head>
 <body>
 
@@ -52,18 +52,17 @@
       <p id="atlas-sub"></p>
     </header>
     <nav id="atlas-tools">
-      <button id="atlas-render" title="把現在的角度存成 PNG；按住 Shift 再按，背景透明">Render</button>
       <button id="atlas-floor-btn">樓層測繪圖</button>
-      <button id="atlas-set">時間・天氣</button>
-      <button id="atlas-turn">轉 90°</button>
       <button id="atlas-top">俯視</button>
       <button id="atlas-home">回到全圖</button>
+      <button id="atlas-set" hidden>編輯</button>
     </nav>
 
     <!-- 設定：時間、天氣、調色 -->
     <aside id="atlas-panel" hidden>
       <button id="set-close" aria-label="關閉">✕</button>
       <h2>時間與天氣 <b id="set-clock"></b></h2>
+      <p class="set-tip" style="margin-top:0">這個面板只有在自己電腦上打開時才有。網站上的時間會自動跟著當下的時刻。</p>
       <input id="set-time" type="range" min="0" max="23.75" step="0.25">
       <div id="set-weather"></div>
     </aside>
@@ -95,7 +94,7 @@
     <footer id="atlas-foot">
       <p id="lens-note" hidden></p>
       <nav id="atlas-lens"></nav>
-      <p id="atlas-meta"><span>拖曳旋轉　·　滾輪或雙指縮放　·　WASD 移動　·　Q / E 旋轉　·　點水源市場看樓層　·　Esc 隱藏文字</span><span><span id="atlas-count"></span>　<button id="atlas-src">資料來源</button></span></p>
+      <p id="atlas-meta"><span class="hint-touch">單指旋轉　·　雙指縮放與移動　·　點水源市場看樓層</span><span class="hint-key">拖曳旋轉　·　滾輪縮放　·　WASD 移動　·　Q / E 旋轉　·　點水源市場看樓層　·　Esc 隱藏文字</span><span><span id="atlas-count"></span>　<button id="atlas-src">資料來源</button></span></p>
     </footer>
   </main>
 
@@ -103,6 +102,6 @@
   <script src="data/atlas.js"></script>
   <!-- 這兩個檔案常改，加上時間戳記，免得瀏覽器拿到舊的 -->
   <script>document.write('<script src="data/site.js?t=' + Date.now() + '"><\/script><script src="data/style.js?t=' + Date.now() + '"><\/script>');</script>
-  <script src="js/atlas.js?v=7"></script>
+  <script src="js/atlas.js?v=8"></script>
 </body>
 </html>
