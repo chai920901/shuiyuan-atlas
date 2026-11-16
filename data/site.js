@@ -45,7 +45,6 @@ window.ATLAS_SITE = {
     { label: '維基百科：Wellspring Theater', url: 'https://en.wikipedia.org/wiki/Wellspring_Theater', note: '水源劇場位於十樓、大樓沿革。' },
     { label: '關鍵評論網：水源劇場專訪', url: 'https://www.thenewslens.com/article/52689', note: '劇場約五百席，前身為兵役單位禮堂，與市場、公家機關同棟。' },
     { label: 'etnet：水源市場介紹', url: 'https://www.etnet.com.hk/www/tc/health/101920', note: '一、二樓市場的攤位類型。' },
-    { label: '巷口微光　摺頁地圖', note: '場域範圍參考。' },
     { label: '本站推估', note: '人流、車流是依路網與道路等級推估的示意，不是實測。山的高度、各樓層的高度與室內配置為示意。三到九樓的使用單位待補。' },
   ],
 
