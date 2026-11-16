@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#efe7d2">
+  <link rel="icon" href="data:,">
   <title>水源市場　周邊地圖</title>
   <meta name="description" content="水源市場周邊的立體地圖：可以旋轉、縮放，切換人流、車流、建築高度與步行圈。">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -52,6 +53,7 @@
     </header>
     <nav id="atlas-tools">
       <button id="atlas-render" title="把現在的角度存成 PNG；按住 Shift 再按，背景透明">Render</button>
+      <button id="atlas-floor-btn">樓層介紹</button>
       <button id="atlas-set">時間・天氣</button>
       <button id="atlas-turn">轉 90°</button>
       <button id="atlas-top">俯視</button>
@@ -77,6 +79,16 @@
           <button id="shot-close">關閉</button>
         </div>
         <p class="shot-tip">下載沒反應的話，在圖上按右鍵（手機長按）選「另存圖片」。</p>
+      </div>
+    </aside>
+
+    <!-- 樓層介紹：左邊一排樓層，選了之後主體從那一層以上掀開 -->
+    <aside id="atlas-floors" hidden>
+      <button id="floor-close" aria-label="關閉">✕</button>
+      <nav id="floor-list"></nav>
+      <div id="floor-card">
+        <h2 id="floor-name"></h2>
+        <p id="floor-text"></p>
       </div>
     </aside>
 

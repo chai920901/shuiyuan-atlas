@@ -21,6 +21,22 @@ window.ATLAS_SITE = {
     { zh: '臺灣大學', en: 'National Taiwan University', lat: 25.01560, lng: 121.53760, crowd: 0.5 },
   ],
 
+  // 水源市場各樓層（由下往上）。from / to 是這一層的地板與天花板高度（公尺），天橋接在第二層的地板高度。
+  // kind 決定切開後裡面畫什麼：market 是攤位，office 是隔間，theatre 是舞台與座位。
+  // name 和 text 可以直接改。目前只有一、二樓和十樓查得到資料，三到九樓的單位待補。
+  floors: [
+    { id: '1F', from: 0, to: 5, kind: 'market', name: '水源市場　一樓', text: '小吃與餐飲、蔬果、南北雜貨。手扶梯從這裡上二樓。' },
+    { id: '2F', from: 5, to: 9.5, kind: 'market', name: '水源市場　二樓', text: '肉品、海鮮，還有縫補、生活百貨的攤位。跨過羅斯福路的天橋從這一層接進來。' },
+    { id: '3F', from: 9.5, to: 13, kind: 'office', name: '辦公樓層', text: '公家機關的辦公空間（單位待補）。' },
+    { id: '4F', from: 13, to: 16.5, kind: 'office', name: '辦公樓層', text: '公家機關的辦公空間（單位待補）。' },
+    { id: '5F', from: 16.5, to: 20, kind: 'office', name: '辦公樓層', text: '公家機關的辦公空間（單位待補）。' },
+    { id: '6F', from: 20, to: 23.5, kind: 'office', name: '辦公樓層', text: '公家機關的辦公空間（單位待補）。' },
+    { id: '7F', from: 23.5, to: 27, kind: 'office', name: '辦公樓層', text: '公家機關的辦公空間（單位待補）。' },
+    { id: '8F', from: 27, to: 30.5, kind: 'office', name: '辦公樓層', text: '公家機關的辦公空間（單位待補）。' },
+    { id: '9F', from: 30.5, to: 34, kind: 'office', name: '辦公樓層', text: '公家機關的辦公空間（單位待補）。' },
+    { id: '10F', from: 34, to: 40, kind: 'theatre', name: '水源劇場', text: '大約五百席的表演場地，前身是兵役單位的禮堂。' },
+  ],
+
   // 要寫在路面上的路名
   roads: ['羅斯福路四段', '汀州路三段', '基隆路四段', '思源街', '福和橋', '永福橋', '舟山路'],
 };

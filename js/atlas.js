@@ -39,6 +39,8 @@
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = T.PCFSoftShadowMap;
   renderer.shadowMap.autoUpdate = false;
+  renderer.localClippingEnabled = true;                                         // 樓層介紹要把主體從某一層以上切掉
+  const CUT = new T.Plane(new T.Vector3(0, -1, 0), 9999);                      // 只留下這個高度以下的部分
   const scene = new T.Scene();
   const camera = new T.OrthographicCamera(-1, 1, 1, -1, 1, 6000);
   const HOME = { az: -0.62, el: 0.66 };
@@ -287,6 +289,7 @@
     return new T.Mesh(g, fill(new T.MeshLambertMaterial({ map: texFacade(), side: T.DoubleSide })));
   }
 
+  const FLOORS = S.floors || [];                                                // 主體的樓層（由下往上），高度以公尺計
   let town;
   function buildings() {
     let hero = null;
@@ -294,7 +297,7 @@
     S.notes.forEach((s) => {
       s.at = toXY(s);
       const b = s.mark && houseAt(s.at, 60);
-      if (b && !b.tone) { b.tone = s.mark === 'main' ? C.key : C.key2; s.h = b.h; if (s.mark === 'main') { hero = s; b.hero = true; b.h = Math.max(b.h, 40); s.h = b.h; } }
+      if (b && !b.tone) { b.tone = s.mark === 'main' ? C.key : C.key2; s.h = b.h; if (s.mark === 'main') { hero = s; b.hero = true; b.h = FLOORS.length ? FLOORS[FLOORS.length - 1].to : Math.max(b.h, 40); s.h = b.h; } }
     });
     if (hero) {                                                                 // 主體四周的房子染成暖色，越近越濃；再遠的維持米色
       D.buildings.forEach((b, n) => {
@@ -364,14 +367,19 @@
     const panel = texPanel(), solidMat = fill(new T.MeshLambertMaterial({ vertexColors: true, map: panel, side: T.DoubleSide }));
     const solid = new T.Mesh(mass((b) => !b.hero, false), solidMat);            // 標準：不透明的量體
     const tall = new T.Mesh(mass((b) => !b.hero, false, true), fill(new T.MeshLambertMaterial({ vertexColors: true, map: panel, side: T.DoubleSide })));   // 分析：依高度上色
-    const main = heroMesh(D.buildings.find((b) => b.hero), edge);                // 主體：每個模式都不透明
+    const heroEdge = [], main = heroMesh(D.buildings.find((b) => b.hero), heroEdge);   // 主體：自己一組稜線，樓層介紹時才能一起切掉
+    main.material.clippingPlanes = [CUT];
+    const hg = new T.BufferGeometry();
+    hg.setAttribute('position', new T.Float32BufferAttribute(heroEdge, 3));
+    const heroLines = new T.LineSegments(hg, ink(0.8)); heroLines.material.clippingPlanes = [CUT]; heroLines.renderOrder = 3;
     [solid, main, tall].forEach((m) => { m.castShadow = m.receiveShadow = true; });
     solidOnly.push(solid); heightOnly.push(tall);
     const eg = new T.BufferGeometry();
     eg.setAttribute('position', new T.Float32BufferAttribute(edge, 3));
     const lines = new T.LineSegments(eg, ink(0.8));
     lines.renderOrder = 3;
-    town = new T.Group(); town.add(solid, tall, main, lines); scene.add(town);
+    town = new T.Group(); town.add(solid, tall, main, heroLines, lines); scene.add(town);
+    heroRing = D.buildings.find((b) => b.hero).p;
     roofs();
   }
 
@@ -509,11 +517,78 @@
       else if (n >= 2 && ok(u, v, 3.4, 2.2)) { k.tone('#56677a'); [-1.2, 1.2].forEach((o) => { const q = at(u, v + o); k.box(q[0], q[1], ang, 3.2, 0.85, h + 0.3, h + 0.55); }); }
     });
     if (ok(0, -hv - 3, 0.3, 0.3)) { const q = at(0, -hv - 3); k.tone('#6b7885'); k.box(q[0], q[1], ang, 0.12, 0.12, h, h + 8); k.tone('#d93a1e'); const f = at(1.3, -hv - 3); k.box(f[0], f[1], ang, 1.2, 0.06, h + 6.2, h + 7.8); }
+    // 每一層的樓板和一點室內：市場是一格一格的攤位，辦公樓層是隔間，劇場是舞台和階梯座位。平常藏在樓裡，樓層介紹切開才看得到
+    const tones = { market: mix(pink, '#ffffff', 0.78), office: '#e3ecf7', theatre: '#e6dcf0' };
+    const stall = [soft, '#f1d98a', '#9fd3c7', white, '#f29a6b', lilac];
+    const plate = new T.Shape(ring.map((q) => new T.Vector2(q[0], q[1])));
+    FLOORS.forEach((f, n) => {
+      const m = new T.Mesh(up(new T.ShapeGeometry(plate)), fill(new T.MeshLambertMaterial({ color: tones[f.kind] || tones.office, clippingPlanes: [CUT] })));
+      m.position.y = f.from + 0.08; m.receiveShadow = true; town.add(m);
+      if (f.kind === 'market') {
+        let i = n;
+        for (let u = -22; u <= 22; u += 4.6) for (let v = -22; v <= 22; v += 4.6) {
+          if (!ok(u, v, 1.5, 1.5) || (Math.abs(u) < 2 && Math.abs(v) < 6)) continue;      // 中間留一條走道
+          const q = at(u, v); k.tone(stall[i++ % stall.length]); k.box(q[0], q[1], ang, 1.5, 1.5, f.from + 0.1, f.from + 1.3);
+        }
+      } else if (f.kind === 'theatre') {
+        if (ok(-13, 0, 3, 9)) { const q = at(-13, 0); k.tone('#3b2a2a'); k.box(q[0], q[1], ang, 3, 9, f.from + 0.1, f.from + 1.1); }
+        for (let i = 0; i < 8; i++) { const u = -6 + i * 2.6; if (ok(u, 0, 1, 9)) { const q = at(u, 0); k.tone(mix('#7a4a8c', '#ffffff', (i % 2) * 0.15)); k.box(q[0], q[1], ang, 1, 9, f.from + 0.1, f.from + 0.5 + i * 0.35); } }
+      } else {
+        for (let u = -18; u <= 18; u += 7) if (ok(u, 0, 0.15, 10)) { const q = at(u, 0); k.tone('#b9c7d8'); k.box(q[0], q[1], ang, 0.12, 10, f.from + 0.1, f.from + 2.3); }
+        for (let u = -15; u <= 15; u += 7) for (let v = -8; v <= 8; v += 5.5) if (ok(u, v, 1.2, 0.7)) { const q = at(u, v); k.tone('#d9c3a0'); k.box(q[0], q[1], ang, 1.2, 0.7, f.from + 0.1, f.from + 0.85); }
+      }
+    });
     const grp = k.mesh();
+    grp.children.forEach((c) => { c.material.clippingPlanes = [CUT]; });
     town.add(grp); roofOnly.push(grp);
   }
 
+  // ---------- 天橋：從市場二樓接出去，跨過羅斯福路。橋面、欄杆、橋墩、兩端的樓梯 ----------
+  function skywalk() {
+    const p = heroSpan, second = FLOORS[1];
+    if (!p) return;
+    const k = kit(), H = second ? second.from : 5, a = heroRing && nearRing(p[0], heroRing) < nearRing(p[p.length - 1], heroRing) ? p[0] : p[p.length - 1], b = a === p[0] ? p[p.length - 1] : p[0];
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]), ux = (b[0] - a[0]) / len, uy = (b[1] - a[1]) / len, ang = Math.atan2(uy, ux), W = 1.8;
+    const at = (s, o) => [a[0] + ux * s - uy * o, a[1] + uy * s + ux * o];
+    const rail = C.heroSky, deck = '#e8eef5';
+    let q = at(len / 2, 0);
+    k.tone(deck); k.box(q[0], q[1], ang, len / 2, W, H - 0.45, H);                                   // 橋面
+    [-1, 1].forEach((side) => {                                                                      // 欄杆：上下兩道橫桿加立柱
+      q = at(len / 2, side * (W - 0.08));
+      k.tone(rail); k.box(q[0], q[1], ang, len / 2, 0.07, H + 1.0, H + 1.15); k.box(q[0], q[1], ang, len / 2, 0.05, H + 0.5, H + 0.58);
+      k.tone('#f4f8fc'); for (let s = 0.4; s < len; s += 2.2) { const t = at(s, side * (W - 0.08)); k.box(t[0], t[1], ang, 0.06, 0.06, H, H + 1.0); }
+    });
+    k.tone(C.pier); for (let s = 7; s < len - 2; s += 9) { q = at(s, 0); k.box(q[0], q[1], ang, 0.45, 0.45, 0, H - 0.45); k.box(q[0], q[1], ang, 0.7, W * 0.8, H - 0.9, H - 0.45); }
+    k.tone('#14275e'); q = at(-0.2, 0); k.box(q[0], q[1], ang, 0.25, W, H, H + 2.8);                 // 接進二樓的門口
+    // 樓梯：一階一階往下，中間一個平台轉向。start 是橋上的起點，dir 是往下走的方向（1 或 -1，沿著跟橋垂直的方向）
+    const stairs = (s, dir) => {
+      const steps = 16, rise = H / steps, run = 0.55, half = steps / 2;
+      q = at(s, dir * (W + 1.3)); k.tone(deck); k.box(q[0], q[1], ang, 1.3, 1.3, H - 0.3, H);       // 橋邊的平台
+      for (let i = 0; i < steps; i++) {
+        const top = H - (i + 1) * rise, first = i < half, o = dir * (W + 2.6 + (first ? i : steps - 1 - i) * run + run / 2), back = first ? 0 : 2.8;
+        q = at(s + back, o);
+        k.tone(i % 2 ? '#dfe6ee' : deck); k.box(q[0], q[1], ang, 1.3, run / 2, Math.max(0, top - 0.5), top);
+      }
+      q = at(s + 1.4, dir * (W + 2.6 + half * run + 1.3)); k.tone(deck); k.box(q[0], q[1], ang, 2.7, 1.3, H / 2 - 0.3, H / 2);   // 轉向的平台
+      k.tone(C.pier); k.box(q[0], q[1], ang, 0.3, 0.3, 0, H / 2 - 0.3);
+      k.tone(rail); [[s - 1.3, 0], [s + 4.1, 2.8]].forEach(([e]) => { const r = at(e, dir * (W + 2.6 + half * run / 2)); k.box(r[0], r[1], ang, 0.05, half * run / 2, H * 0.75 + 0.9, H * 0.75 + 1.0); });
+    };
+    stairs(len - 1.5, 1); stairs(len - 1.5, -1); stairs(6.5, -1);                                    // 對街兩座，市場門口一座
+    const grp = k.mesh();
+    town.add(grp);
+  }
+
   // ---------- 橋：高架橋與天橋。橋面是一條有厚度的帶子，下面每隔一段立橋墩 ----------
+  let heroRing = null, heroSpan = null;
+  function nearRing(q, ring) {                                                  // 點到多邊形邊緣的距離
+    let best = 1e9;
+    for (let i = 0; i < ring.length; i++) {
+      const a = ring[i], b = ring[(i + 1) % ring.length], dx = b[0] - a[0], dy = b[1] - a[1];
+      const t = Math.max(0, Math.min(1, ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / (dx * dx + dy * dy || 1)));
+      best = Math.min(best, Math.hypot(q[0] - a[0] - dx * t, q[1] - a[1] - dy * t));
+    }
+    return best;
+  }
   function bridges() {
     const pos = [], nor = [], col = [], edge = [], c = new T.Color();
     const tri = (a, b, d, n) => {                                               // 三角形一律朝 n 那一面
@@ -525,6 +600,7 @@
     (D.bridges || []).forEach((b) => {
       const p = b.p, foot = b.k === 'foot', thick = foot ? 0.7 : 1.5, top = foot ? C.key2 : C.deck, side = foot ? '#f6efdc' : C.pier;
       if (p.length < 2 || Math.max(...p.map((q) => q[2])) < 2.5) return;
+      if (foot && heroRing && [p[0], p[p.length - 1]].some((q) => nearRing(q, heroRing) < 4)) { heroSpan = p; return; }   // 接在市場上的天橋另外細做
       const L = [], R = [];
       p.forEach((q, i) => {
         const a = p[Math.max(0, i - 1)], d = p[Math.min(p.length - 1, i + 1)], len = Math.hypot(d[0] - a[0], d[1] - a[1]) || 1;
@@ -790,7 +866,8 @@
     [fills, inks, solidOnly, heightOnly, roofOnly, crowd, colorOnly, growers, words, blobs, lensObj.walk, lensObj.car, lensObj.height, lensObj.reach].forEach((a) => { a.length = 0; });
     flock.length = 0;
     derive(); seed = 11;
-    ground(); buildings(); bridges(); hills();
+    heroSpan = null;
+    ground(); buildings(); bridges(); skywalk(); hills();
     const leaf = texTrees();
     colorOnly.push(standees(D.trees.filter((t) => !t[4]), 9, 14.5, 3, 2, leaf, 3.4));
     colorOnly.push(standees(D.trees.filter((t, i) => t[5] > 0 && i % 5 === 0), 9, 14.5, 3, 2, leaf, 3.4, (t) => 0.2 + t[5] * RISE));   // 山上只留一些樹
@@ -799,6 +876,34 @@
     town.scale.y = Math.max(0.001, ease(grow));
     growers.forEach((m) => { m.uniforms.grow.value = ease(Math.max(0, grow * 1.4 - 0.4)); });
     setMode(mode);
+  }
+
+  // ---------- 樓層介紹：選一層，主體從這一層的天花板以上切掉，露出這一層的樓板 ----------
+  let floorAt = -1;
+  function setFloor(i) {
+    floorAt = i;
+    const f = FLOORS[i];
+    CUT.constant = f ? f.to + 0.02 : 9999;
+    [...document.getElementById('floor-list').children].forEach((b) => b.classList.toggle('on', +b.dataset.i === i));
+    document.getElementById('floor-name').textContent = f ? f.id + '　' + f.name : '整棟';
+    document.getElementById('floor-text').textContent = f ? f.text : '選一層樓，上面的樓層會掀開，看到這一層裡面有什麼。';
+    dirty = true;
+  }
+  function floorsUi() {
+    const box = document.getElementById('atlas-floors'), list = document.getElementById('floor-list'), hero = S.notes.find((n) => n.mark === 'main');
+    if (!FLOORS.length || !hero) { document.getElementById('atlas-floor-btn').hidden = true; return; }
+    const add = (label, i) => { const b = document.createElement('button'); b.textContent = label; b.dataset.i = i; b.addEventListener('click', () => setFloor(i)); list.appendChild(b); };
+    add('整棟', -1);
+    for (let i = FLOORS.length - 1; i >= 0; i--) add(FLOORS[i].id, i);         // 高樓層在上面
+    document.getElementById('atlas-floor-btn').addEventListener('click', () => {
+      box.hidden = !box.hidden;
+      if (box.hidden) { setFloor(-1); return; }
+      setMode('a', 'map'); setFloor(floorAt);
+      view.az = ((view.az - 2.1 + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI + 2.1;
+      fly({ tx: hero.at.x, tz: -hero.at.y, size: 62, az: 2.1, el: 0.6 });      // 轉到看得到正面和天橋的角度
+    });
+    document.getElementById('floor-close').addEventListener('click', () => { box.hidden = true; setFloor(-1); });
+    setFloor(-1);
   }
 
   // ---------- 分析模式（lens）。量體永遠是標準的不透明樣子，只有「建築高度」會換成依高度上色 ----------
@@ -1062,12 +1167,12 @@
     sun.shadow.bias = -0.0012;
     scene.add(amb, sun, sun.target);
 
-    build(); markers(); legend(); controls(); settings();
+    build(); markers(); legend(); controls(); settings(); floorsUi();
     fit = fitSize();
     view.size = fit;
     document.getElementById('atlas-count').textContent = D.buildings.length + ' 棟建築　' + D.trees.length + ' 棵樹　' + D.people.length + ' 個人';
     requestAnimationFrame(loop);
-    window.ATLAS = { view, fly, setMode, sky, applySky, redraw: () => { dirty = true; } };          // 給主控台用：ATLAS.fly({ tx, tz, size, az, el })
+    window.ATLAS = { view, fly, setMode, setFloor, sky, applySky, redraw: () => { dirty = true; } };          // 給主控台用：ATLAS.fly({ tx, tz, size, az, el })
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { dirty = true; });
   }
   start();

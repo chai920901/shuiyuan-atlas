@@ -7,13 +7,18 @@
 - 地圖：水源市場是細緻的主體模型，周邊是乾淨的量體；樹林做成一層層隆起的山，高架橋與天橋有高度和橋墩。
 - 時間與天氣：影子的方向、深淺和天色跟著變，有太陽、月亮、雲和雨。
 - 分析模式：人流、車流、建築高度、步行圈。
+- 樓層介紹：選一層樓，水源市場從那一層以上掀開，看到裡面有什麼。
 - Render：把目前的角度存成 PNG（按住 Shift 是透明背景）。
+
+## 怎麼改顏色
+
+打開 `data/style.js`，改引號裡的色碼，存檔，再用 GitHub Desktop commit 並 push。網站一兩分鐘後就會更新。樓層的名稱和介紹文字在 `data/site.js` 的 `floors`。
 
 ## 檔案
 
 - `data/atlas.js`：地形、建築、橋、樹、路網（由 `tools/build-atlas.py` 從 OpenStreetMap 產生）
-- `data/site.js`：圖名、地標、要顯示的路名、人流聚集點
-- `data/style.js`：要覆蓋的顏色、預設的時間與天氣
+- `data/site.js`：圖名、地標、要顯示的路名、人流聚集點、水源市場各樓層的介紹
+- `data/style.js`：所有顏色、預設的時間與天氣
 - `js/atlas.js`：繪圖程式
 - `tools/build-atlas.py`：重新產生 `data/atlas.js`（需要 Python 與 shapely，用法寫在檔案開頭）
 
