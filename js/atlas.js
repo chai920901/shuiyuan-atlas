@@ -10,10 +10,10 @@
     wood: '#3f6c49', lawn: '#d3dfae', lawnLine: '#4f8e58',
     major: '#c4776b', minor: '#d79c8f', lane: '#e6c4b5', foot: '#f9f3e6',
     wall: '#f3e8cb', deck: '#b9655a', pier: '#d8ccb2', key: '#d93a1e', key2: '#e9b44c',
-    heroBlue: '#1a44c8', heroSky: '#2f8fe6', heroPink: '#d81b72',
+    heroBlue: '#1a44c8', heroSky: '#2f8fe6', heroPink: '#d81b72', tint: '#d81b72',
   };
   const PALETTE = [['paper', '紙底'], ['ink', '墨線'], ['sea', '水面'], ['wave', '水紋'], ['wood', '樹林／山'], ['lawn', '草地'], ['lawnLine', '草地條紋'],
-    ['major', '大馬路'], ['minor', '街道'], ['lane', '巷道'], ['foot', '步道'], ['wall', '建築'], ['deck', '高架橋'], ['key2', '地標／天橋'],
+    ['major', '大馬路'], ['minor', '街道'], ['lane', '巷道'], ['foot', '步道'], ['wall', '建築'], ['tint', '市場周邊的房子'], ['deck', '高架橋'], ['key2', '地標／天橋'],
     ['heroBlue', '市場　深藍'], ['heroSky', '市場　淺藍'], ['heroPink', '市場　杜鵑']];
   const STORE = 'atlas-palette-' + S.id;
   // data/style.js 裡可以覆蓋預設的顏色、時間、天氣
@@ -27,8 +27,8 @@
   function derive() {                                                           // 由主色推出深淺變化
     C.woodDark = mix(C.wood, '#000000', 0.28); C.woodLight = mix(C.wood, '#ffffff', 0.25);
     C.walls = [C.wall, mix(C.wall, '#000000', 0.04), mix(C.wall, '#ffffff', 0.4), mix(C.wall, '#000000', 0.09)];
-    C.near = [mix(C.heroPink, '#ffffff', 0.58), mix(C.heroPink, '#ffffff', 0.7), mix(C.heroPink, '#ffffff', 0.46)];   // 市場四周的房子：杜鵑花的淡色
-    C.mid = [mix(C.heroPink, '#ffffff', 0.82), mix(C.heroPink, '#fff3d6', 0.86), mix(C.heroPink, '#ffffff', 0.76)];
+    C.near = [mix(C.tint, '#ffffff', 0.58), mix(C.tint, '#ffffff', 0.7), mix(C.tint, '#ffffff', 0.46)];   // 市場四周的房子：tint 調淡。跟主體的杜鵑色分開，改這個不會動到主體
+    C.mid = [mix(C.tint, '#ffffff', 0.82), mix(C.tint, '#fff3d6', 0.86), mix(C.tint, '#ffffff', 0.76)];
   }
   derive();
   const HW = D.half[0], HH = D.half[1];
@@ -93,14 +93,66 @@
     }
   }), 30);
 
-  const texWood = () => tile(sheet(256, 256, (g, w, h) => {
-    g.fillStyle = C.wood; g.fillRect(0, 0, w, h);
-    for (let i = 0; i < 2600; i++) {
-      g.fillStyle = rnd() < 0.62 ? C.woodDark : C.woodLight;
-      const r = 0.6 + rnd() * 1.5;
-      g.beginPath(); g.arc(rnd() * w, rnd() * h, r, 0, Math.PI * 2); g.fill();
+  // 山與樹林：植栽配置圖的畫法。淡底上一塊一塊不同的填紋（直條、橫線、波紋、斜格、密格、點），虛線圍邊，再放幾個線畫的樹
+  const texWood = () => tile(sheet(1024, 1024, (g, w, h) => {
+    const pale = mix(C.wood, '#fffdf2', 0.88), edge = 'rgba(96,98,86,.55)';
+    g.fillStyle = pale; g.fillRect(0, 0, w, h);
+    const around = (draw) => { for (let dx = -w; dx <= w; dx += w) for (let dy = -h; dy <= h; dy += h) { g.save(); g.translate(dx, dy); draw(); g.restore(); } };   // 畫九次，接縫才對得上
+    const blob = (cx, cy, r, n) => {                                            // 不規則的圓角色塊
+      const pts = [], spin = rnd() * 6.28;
+      for (let i = 0; i < n; i++) { const a = spin + (i / n) * 6.283, d = r * (0.62 + rnd() * 0.6); pts.push([cx + Math.cos(a) * d * 1.15, cy + Math.sin(a) * d]); }
+      return () => {
+        g.beginPath();
+        pts.forEach((p, i) => { const q = pts[(i + 1) % n], mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2; if (!i) { const o = pts[n - 1]; g.moveTo((o[0] + p[0]) / 2, (o[1] + p[1]) / 2); } g.quadraticCurveTo(p[0], p[1], mx, my); });
+        g.closePath();
+      };
+    };
+    const lines = (cx, cy, r, gap, wd, ang, wave) => {                         // 一組平行線，可轉角度、可帶波
+      g.save(); g.translate(cx, cy); g.rotate(ang); g.lineWidth = wd; g.beginPath();
+      for (let y = -r; y <= r; y += gap) {
+        g.moveTo(-r, y);
+        if (wave) for (let x = -r; x <= r; x += 8) g.lineTo(x, y + Math.sin(x / 9 + y) * wave); else g.lineTo(r, y);
+      }
+      g.stroke(); g.restore();
+    };
+    const green = mix(C.wood, '#6fb04a', 0.35);
+    const KIND = [
+      (x, y, r) => { g.fillStyle = mix(green, pale, 0.72); g.fill(); g.strokeStyle = green; lines(x, y, r, 15, 3.4, Math.PI / 2); },                       // 綠直條
+      (x, y, r) => { g.fillStyle = mix('#b7a2d8', pale, 0.7); g.fill(); g.strokeStyle = '#9d86c9'; lines(x, y, r, 8, 1.3, 0); },                          // 紫橫線
+      (x, y, r) => { g.fillStyle = '#f0e27a'; g.fill(); g.strokeStyle = '#c9b53c'; lines(x, y, r, 7, 1.1, 0, 2.2); },                                     // 黃波紋
+      (x, y, r) => { g.fillStyle = mix('#c99a70', pale, 0.55); g.fill(); g.strokeStyle = '#b07f55'; lines(x, y, r, 9, 1, 0.9); lines(x, y, r, 9, 1, -0.9); },   // 棕斜格
+      (x, y, r) => { g.fillStyle = '#c3c4d2'; g.fill(); g.strokeStyle = '#55577a'; lines(x, y, r, 5, 1, 0.5); lines(x, y, r, 5, 1, -1.07); },             // 深色密格
+      (x, y, r) => { g.fillStyle = mix('#c99a70', pale, 0.8); g.fill(); for (let i = 0; i < r * r / 26; i++) { g.fillStyle = rnd() < 0.45 ? '#b8473f' : '#a98a66'; g.beginPath(); g.arc(x + (rnd() * 2 - 1) * r, y + (rnd() * 2 - 1) * r, 1.7, 0, 6.3); g.fill(); } },   // 紅棕點
+      (x, y, r) => { g.fillStyle = mix(green, pale, 0.84); g.fill(); g.strokeStyle = mix(green, '#5c6b52', 0.5); g.lineWidth = 1; g.beginPath(); for (let i = 0; i < r * r / 30; i++) { const px = x + (rnd() * 2 - 1) * r, py = y + (rnd() * 2 - 1) * r; g.moveTo(px, py); g.lineTo(px + 1.5, py - 5); } g.stroke(); },   // 草葉短線
+      (x, y, r) => { g.fillStyle = mix('#e6e0a0', pale, 0.4); g.fill(); g.strokeStyle = '#b9bf6a'; lines(x, y, r, 6, 1, Math.PI / 2); },                  // 淡黃細直條
+    ];
+    for (let j = 0; j < 5; j++) for (let i = 0; i < 5; i++) {
+      const cx = (i + 0.2 + rnd() * 0.6) * w / 5, cy = (j + 0.2 + rnd() * 0.6) * h / 5, r = 78 + rnd() * 52, path = blob(cx, cy, r, 7 + Math.floor(rnd() * 3));
+      const kind = KIND[Math.floor(rnd() * KIND.length)], s0 = seed;
+      around(() => {
+        seed = s0;                                                              // 九份都要長得一樣
+        g.save(); path(); g.clip(); path(); kind(cx, cy, r * 1.5); g.restore();
+        g.setLineDash([7, 5]); g.strokeStyle = edge; g.lineWidth = 1.4; path(); g.stroke(); g.setLineDash([]);
+      });
     }
-  }), 44);
+    for (let i = 0; i < 9; i++) {                                               // 放射線的樹
+      const cx = rnd() * w, cy = rnd() * h, r = 34 + rnd() * 26, n = 38;
+      around(() => {
+        g.strokeStyle = 'rgba(120,120,112,.8)'; g.lineWidth = 1.3; g.beginPath();
+        for (let k = 0; k < n; k++) { const a = (k / n) * 6.283; g.moveTo(cx + Math.cos(a) * r * 0.12, cy + Math.sin(a) * r * 0.12); g.lineTo(cx + Math.cos(a) * r * (k % 2 ? 1 : 0.82), cy + Math.sin(a) * r * (k % 2 ? 1 : 0.82)); }
+        g.stroke();
+      });
+    }
+    for (let i = 0; i < 12; i++) {                                              // 圓圈的樹，邊上一圈紅果
+      const cx = rnd() * w, cy = rnd() * h, r = 20 + rnd() * 14, n = 9 + Math.floor(rnd() * 6), off = rnd() * 6.28;
+      around(() => {
+        g.fillStyle = 'rgba(176,196,160,.72)'; g.strokeStyle = 'rgba(96,104,90,.8)'; g.lineWidth = 1.2;
+        g.beginPath(); g.arc(cx, cy, r, 0, 6.3); g.fill(); g.stroke();
+        g.fillStyle = '#c2453d';
+        for (let k = 0; k < n; k++) { const a = off + (k / n) * 4.2; g.beginPath(); g.arc(cx + Math.cos(a) * r * 0.82, cy + Math.sin(a) * r * 0.82, 2.2, 0, 6.3); g.fill(); }
+      });
+    }
+  }), 96);
 
   const texLawn = () => tile(sheet(64, 64, (g, w, h) => {
     g.fillStyle = C.lawn; g.fillRect(0, 0, w, h);
@@ -315,7 +367,7 @@
       }
       const rg = new T.BufferGeometry();
       rg.setAttribute('position', new T.Float32BufferAttribute(ring, 3));
-      const halo = new T.LineSegments(rg, new T.LineBasicMaterial({ color: C.heroPink }));
+      const halo = new T.LineSegments(rg, new T.LineBasicMaterial({ color: C.tint }));
       scene.add(halo); colorOnly.push(halo);
     }
     const edge = [], white = new T.Color('#ffffff');
