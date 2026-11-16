@@ -93,66 +93,17 @@
     }
   }), 30);
 
-  // 山與樹林：植栽配置圖的畫法。淡底上一塊一塊不同的填紋（直條、橫線、波紋、斜格、密格、點），虛線圍邊，再放幾個線畫的樹
-  const texWood = () => tile(sheet(1024, 1024, (g, w, h) => {
-    const pale = mix(C.wood, '#fffdf2', 0.88), edge = 'rgba(96,98,86,.55)';
+  // 山與樹林：植栽配置圖裡的一種填紋——淡底上一排一排的波紋線
+  const texWood = () => tile(sheet(256, 256, (g, w, h) => {
+    const pale = mix(C.wood, '#fffdf2', 0.8);
     g.fillStyle = pale; g.fillRect(0, 0, w, h);
-    const around = (draw) => { for (let dx = -w; dx <= w; dx += w) for (let dy = -h; dy <= h; dy += h) { g.save(); g.translate(dx, dy); draw(); g.restore(); } };   // 畫九次，接縫才對得上
-    const blob = (cx, cy, r, n) => {                                            // 不規則的圓角色塊
-      const pts = [], spin = rnd() * 6.28;
-      for (let i = 0; i < n; i++) { const a = spin + (i / n) * 6.283, d = r * (0.62 + rnd() * 0.6); pts.push([cx + Math.cos(a) * d * 1.15, cy + Math.sin(a) * d]); }
-      return () => {
-        g.beginPath();
-        pts.forEach((p, i) => { const q = pts[(i + 1) % n], mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2; if (!i) { const o = pts[n - 1]; g.moveTo((o[0] + p[0]) / 2, (o[1] + p[1]) / 2); } g.quadraticCurveTo(p[0], p[1], mx, my); });
-        g.closePath();
-      };
-    };
-    const lines = (cx, cy, r, gap, wd, ang, wave) => {                         // 一組平行線，可轉角度、可帶波
-      g.save(); g.translate(cx, cy); g.rotate(ang); g.lineWidth = wd; g.beginPath();
-      for (let y = -r; y <= r; y += gap) {
-        g.moveTo(-r, y);
-        if (wave) for (let x = -r; x <= r; x += 8) g.lineTo(x, y + Math.sin(x / 9 + y) * wave); else g.lineTo(r, y);
-      }
-      g.stroke(); g.restore();
-    };
-    const green = mix(C.wood, '#6fb04a', 0.35);
-    const KIND = [
-      (x, y, r) => { g.fillStyle = mix(green, pale, 0.72); g.fill(); g.strokeStyle = green; lines(x, y, r, 15, 3.4, Math.PI / 2); },                       // 綠直條
-      (x, y, r) => { g.fillStyle = mix('#b7a2d8', pale, 0.7); g.fill(); g.strokeStyle = '#9d86c9'; lines(x, y, r, 8, 1.3, 0); },                          // 紫橫線
-      (x, y, r) => { g.fillStyle = '#f0e27a'; g.fill(); g.strokeStyle = '#c9b53c'; lines(x, y, r, 7, 1.1, 0, 2.2); },                                     // 黃波紋
-      (x, y, r) => { g.fillStyle = mix('#c99a70', pale, 0.55); g.fill(); g.strokeStyle = '#b07f55'; lines(x, y, r, 9, 1, 0.9); lines(x, y, r, 9, 1, -0.9); },   // 棕斜格
-      (x, y, r) => { g.fillStyle = '#c3c4d2'; g.fill(); g.strokeStyle = '#55577a'; lines(x, y, r, 5, 1, 0.5); lines(x, y, r, 5, 1, -1.07); },             // 深色密格
-      (x, y, r) => { g.fillStyle = mix('#c99a70', pale, 0.8); g.fill(); for (let i = 0; i < r * r / 26; i++) { g.fillStyle = rnd() < 0.45 ? '#b8473f' : '#a98a66'; g.beginPath(); g.arc(x + (rnd() * 2 - 1) * r, y + (rnd() * 2 - 1) * r, 1.7, 0, 6.3); g.fill(); } },   // 紅棕點
-      (x, y, r) => { g.fillStyle = mix(green, pale, 0.84); g.fill(); g.strokeStyle = mix(green, '#5c6b52', 0.5); g.lineWidth = 1; g.beginPath(); for (let i = 0; i < r * r / 30; i++) { const px = x + (rnd() * 2 - 1) * r, py = y + (rnd() * 2 - 1) * r; g.moveTo(px, py); g.lineTo(px + 1.5, py - 5); } g.stroke(); },   // 草葉短線
-      (x, y, r) => { g.fillStyle = mix('#e6e0a0', pale, 0.4); g.fill(); g.strokeStyle = '#b9bf6a'; lines(x, y, r, 6, 1, Math.PI / 2); },                  // 淡黃細直條
-    ];
-    for (let j = 0; j < 5; j++) for (let i = 0; i < 5; i++) {
-      const cx = (i + 0.2 + rnd() * 0.6) * w / 5, cy = (j + 0.2 + rnd() * 0.6) * h / 5, r = 78 + rnd() * 52, path = blob(cx, cy, r, 7 + Math.floor(rnd() * 3));
-      const kind = KIND[Math.floor(rnd() * KIND.length)], s0 = seed;
-      around(() => {
-        seed = s0;                                                              // 九份都要長得一樣
-        g.save(); path(); g.clip(); path(); kind(cx, cy, r * 1.5); g.restore();
-        g.setLineDash([7, 5]); g.strokeStyle = edge; g.lineWidth = 1.4; path(); g.stroke(); g.setLineDash([]);
-      });
+    g.strokeStyle = mix(C.wood, pale, 0.25); g.lineWidth = 2.6; g.lineCap = 'round';
+    for (let y = 16; y < h; y += 32) {
+      g.beginPath();
+      for (let x = -4; x <= w + 4; x += 4) g.lineTo(x, y + Math.sin((x / 64) * Math.PI * 2 + (y / 32) * 1.7) * 5);
+      g.stroke();
     }
-    for (let i = 0; i < 9; i++) {                                               // 放射線的樹
-      const cx = rnd() * w, cy = rnd() * h, r = 34 + rnd() * 26, n = 38;
-      around(() => {
-        g.strokeStyle = 'rgba(120,120,112,.8)'; g.lineWidth = 1.3; g.beginPath();
-        for (let k = 0; k < n; k++) { const a = (k / n) * 6.283; g.moveTo(cx + Math.cos(a) * r * 0.12, cy + Math.sin(a) * r * 0.12); g.lineTo(cx + Math.cos(a) * r * (k % 2 ? 1 : 0.82), cy + Math.sin(a) * r * (k % 2 ? 1 : 0.82)); }
-        g.stroke();
-      });
-    }
-    for (let i = 0; i < 12; i++) {                                              // 圓圈的樹，邊上一圈紅果
-      const cx = rnd() * w, cy = rnd() * h, r = 20 + rnd() * 14, n = 9 + Math.floor(rnd() * 6), off = rnd() * 6.28;
-      around(() => {
-        g.fillStyle = 'rgba(176,196,160,.72)'; g.strokeStyle = 'rgba(96,104,90,.8)'; g.lineWidth = 1.2;
-        g.beginPath(); g.arc(cx, cy, r, 0, 6.3); g.fill(); g.stroke();
-        g.fillStyle = '#c2453d';
-        for (let k = 0; k < n; k++) { const a = off + (k / n) * 4.2; g.beginPath(); g.arc(cx + Math.cos(a) * r * 0.82, cy + Math.sin(a) * r * 0.82, 2.2, 0, 6.3); g.fill(); }
-      });
-    }
-  }), 96);
+  }), 30);
 
   const texLawn = () => tile(sheet(64, 64, (g, w, h) => {
     g.fillStyle = C.lawn; g.fillRect(0, 0, w, h);
@@ -430,6 +381,7 @@
     heroSrc = [main, heroLines];
     [solid, main, tall].forEach((m) => { m.castShadow = m.receiveShadow = true; });
     solidOnly.push(solid); heightOnly.push(tall);
+    edge.length = 0;                                                            // 基地模不描框線，只有主體留著稜線
     const eg = new T.BufferGeometry();
     eg.setAttribute('position', new T.Float32BufferAttribute(edge, 3));
     const lines = new T.LineSegments(eg, ink(0.8));
@@ -759,25 +711,93 @@
     grp.add(m); scene.add(grp); growers.push(mat);
     return grp;
   }
-  // 小人：四種剪影（深色、白、紅、黃），比真人大一點，遠看才看得到
+  // 小人：深色剪影，八種正在做事的姿勢（走路、提菜、講電話、騎車、推菜籃車、撐傘、牽小孩、遛狗），排成 4 × 2
   function texPeople() {
-    const CW = 64, CH = 128, fills = [C.ink, '#fbf7ee', C.key, C.key2];
-    const t = new T.CanvasTexture(sheet(CW * 4, CH, (g) => {
-      fills.forEach((f, v) => {
-        g.save(); g.translate(v * CW, 0);
-        const cx = CW / 2, lean = v % 2 ? 4 : -4;
-        g.fillStyle = f; g.strokeStyle = C.ink; g.lineWidth = 3; g.lineJoin = 'round';
-        g.beginPath();                                                          // 身體：肩寬、往下收，兩條腿分開
-        g.moveTo(cx - 13, 40); g.lineTo(cx + 13, 40); g.lineTo(cx + 10, 82);
-        g.lineTo(cx + 12 + lean, 124); g.lineTo(cx + 3 + lean, 124); g.lineTo(cx, 90);
-        g.lineTo(cx - 3 - lean, 124); g.lineTo(cx - 12 - lean, 124); g.lineTo(cx - 10, 82);
-        g.closePath(); g.fill(); g.stroke();
-        g.beginPath(); g.arc(cx, 22, 13, 0, Math.PI * 2); g.fill(); g.stroke();
-        g.restore();
-      });
+    const CW = 96, CH = 128, dark = mix(C.ink, '#26262b', 0.72);
+    const t = new T.CanvasTexture(sheet(CW * 4, CH * 2, (g) => {
+      g.fillStyle = g.strokeStyle = dark; g.lineCap = g.lineJoin = 'round';
+      const L = (wd, ...pts) => { g.lineWidth = wd; g.beginPath(); pts.forEach((q, i) => (i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]))); g.stroke(); };
+      const dot = (x, y, r) => { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); };
+      const walker = (d, arms) => {                                             // 跨步走的人；d 是左右位移
+        dot(50 + d, 15, 8.5); L(13, [49 + d, 33], [47 + d, 66]);
+        L(8, [47 + d, 66], [56 + d, 94], [60 + d, 121]); L(8, [47 + d, 66], [38 + d, 94], [28 + d, 119]);
+        L(6, [60 + d, 122], [67 + d, 122]); L(6, [28 + d, 120], [35 + d, 123]);
+        if (arms) { L(6, [49 + d, 35], [40 + d, 52], [34 + d, 64]); L(6, [49 + d, 35], [57 + d, 52], [63 + d, 62]); }
+      };
+      const stand = (d, top) => { dot(48 + d, top, 8.5); L(13, [48 + d, top + 18], [48 + d, top + 52]); L(8, [48 + d, top + 52], [44 + d, 122]); L(8, [48 + d, top + 52], [53 + d, 122]); };
+      const POSE = [
+        () => walker(0, true),
+        () => { walker(0, true); g.fillRect(26, 64, 14, 18); g.fillRect(57, 62, 13, 17); },                                   // 兩手提菜
+        () => { stand(0, 15); L(6, [48, 35], [60, 48], [55, 24]); L(6, [48, 35], [40, 54], [41, 70]); },                      // 講電話
+        () => {                                                                                                               // 騎腳踏車
+          g.lineWidth = 3.4; [22, 74].forEach((x) => { g.beginPath(); g.arc(x, 105, 16, 0, Math.PI * 2); g.stroke(); });
+          L(3.4, [22, 105], [40, 84], [62, 84], [74, 105]); L(3.4, [40, 84], [48, 105], [62, 84]); L(3.4, [40, 84], [38, 74]); L(3.4, [62, 84], [64, 70], [71, 68]);
+          dot(61, 29, 8.5); L(12, [38, 70], [54, 45]); L(5.5, [54, 47], [62, 60], [69, 68]); L(7, [38, 70], [53, 87], [48, 104]); L(7, [38, 70], [46, 86], [40, 98]);
+        },
+        () => {                                                                                                               // 推菜籃車
+          dot(35, 17, 8.5); L(13, [33, 35], [29, 68]); L(8, [29, 68], [37, 96], [39, 121]); L(8, [29, 68], [21, 96], [11, 119]); L(6, [39, 122], [46, 122]); L(6, [11, 120], [18, 123]);
+          L(6, [33, 38], [47, 52], [59, 56]); L(3.4, [59, 56], [63, 70]); g.fillRect(61, 66, 28, 27); L(3.4, [65, 92], [65, 112]); L(3.4, [85, 92], [85, 112]); dot(65, 117, 5); dot(85, 117, 5);
+        },
+        () => {                                                                                                               // 撐傘
+          stand(-2, 32); g.beginPath(); g.ellipse(54, 18, 36, 14, 0, Math.PI, 0); g.closePath(); g.fill();
+          L(3, [56, 18], [56, 54]); L(6, [46, 52], [53, 62], [56, 52]); L(6, [46, 52], [38, 68], [39, 84]);
+        },
+        () => {                                                                                                               // 牽小孩
+          walker(-12, false); L(6, [37, 35], [28, 52], [22, 64]); L(5.5, [37, 35], [50, 56], [62, 74]);
+          dot(73, 64, 6.5); L(10, [73, 78], [73, 98]); L(6, [73, 98], [69, 122]); L(6, [73, 98], [78, 122]); L(4.5, [73, 80], [62, 74]);
+        },
+        () => {                                                                                                               // 遛狗
+          walker(-16, false); L(6, [33, 35], [24, 52], [18, 64]); L(6, [33, 35], [42, 52], [48, 62]);
+          L(2.4, [48, 62], [72, 102]); L(9, [68, 108], [85, 108]); dot(89, 101, 5.5); L(3.4, [69, 108], [68, 122]); L(3.4, [84, 108], [85, 122]); L(3.4, [67, 106], [60, 98]);
+        },
+      ];
+      POSE.forEach((draw, i) => { g.save(); g.translate((i % 4) * CW, Math.floor(i / 4) * CH); draw(); g.restore(); });
     }));
     t.anisotropy = 4;
     return t;
+  }
+
+  // ---------- 街上的白模：汽車、公車、公車亭 ----------
+  const inAny = (p, list) => list.some((rings) => inside(p, rings[0]) && !rings.slice(1).some((r) => inside(p, r)));
+  function traffic() {
+    const k = kit(), F = (D.flows || {}).car || [], white = '#fcfbf7', grey = '#e4e5e3';
+    const road = (p) => inAny(p, D.major) || inAny(p, D.minor) || inAny(p, D.lane);
+    const built = (p) => D.buildings.some((b) => inside(p, b.p));
+    const car = (x, y, a) => { k.tone(white); k.box(x, y, a, 4, 1.7, 0.5, 1.9); k.tone(grey); k.box(x - Math.cos(a) * 0.5, y - Math.sin(a) * 0.5, a, 2.2, 1.5, 1.9, 3); };
+    const bus = (x, y, a) => { k.tone(white); k.box(x, y, a, 8, 1.9, 0.6, 4.4); k.tone(grey); k.box(x, y, a, 7.4, 1.95, 2.2, 3.5); k.tone(white); k.box(x - Math.cos(a) * 2, y - Math.sin(a) * 2, a, 2, 1.1, 4.4, 4.8); };
+    const stops = [];
+    let n = 0;
+    F.forEach((l) => {
+      const w = l[0], q = l[1];
+      if (w < 1.4) return;
+      let next = 10 + rnd() * 40, stopAt = 60 + rnd() * 80;
+      for (let i = 0; i + 3 < q.length; i += 2) {
+        const dx = q[i + 2] - q[i], dy = q[i + 3] - q[i + 1], len = Math.hypot(dx, dy) || 1, ux = dx / len, uy = dy / len, a = Math.atan2(dy, dx);
+        for (; next < len; next += (w >= 2.4 ? 26 : 60) + rnd() * 70) {
+          const side = (rnd() < 0.5 ? -1 : 1) * (w >= 2.4 ? 2 + rnd() * 5 : 1.9), x = q[i] + ux * next + uy * side, y = q[i + 1] + uy * next - ux * side;
+          if (Math.abs(x) > HW - 6 || Math.abs(y) > HH - 6 || !road({ x, y }) || built({ x, y })) continue;
+          if (w >= 2.4 && ++n % 11 === 0) bus(x, y, side > 0 ? a : a + Math.PI); else car(x, y, side > 0 ? a : a + Math.PI);
+        }
+        next -= len;
+        if (w >= 2.4) {
+          for (; stopAt < len; stopAt += 170 + rnd() * 60) {                     // 往右找到路緣，公車亭放在人行道上
+            const px = q[i] + ux * stopAt, py = q[i + 1] + uy * stopAt;
+            let d = 4; while (d < 34 && road({ x: px + uy * d, y: py - ux * d })) d += 1;
+            const x = px + uy * (d + 2.6), y = py - ux * (d + 2.6);
+            if (d >= 34 || Math.abs(x) > HW - 12 || Math.abs(y) > HH - 12 || built({ x, y }) || stops.some((o) => Math.hypot(o[0] - x, o[1] - y) < 90)) continue;
+            stops.push([x, y]);
+            k.tone(white); k.box(x, y, a, 4.4, 1.5, 3.4, 3.7);                                                   // 頂棚
+            k.tone(grey); k.box(x + uy * 1.2, y - ux * 1.2, a, 4.2, 0.12, 0.5, 3.4);                              // 背板
+            k.tone(white); [-4, 4].forEach((e) => k.box(x + ux * e - uy * 1.2, y + uy * e + ux * 1.2, a, 0.14, 0.14, 0.5, 3.4));   // 前柱
+            k.box(x + uy * 0.5, y - ux * 0.5, a, 2.6, 0.4, 0.5, 1.15);                                            // 長椅
+            k.box(x + ux * 6 - uy * 1, y + uy * 6 + ux * 1, a, 0.13, 0.13, 0.5, 4.6); k.tone(C.key2); k.box(x + ux * 6 - uy * 1, y + uy * 6 + ux * 1, a, 0.7, 0.16, 3.7, 4.7);   // 站牌
+            if (stops.length % 2) bus(px + uy * (d - 2.6), py - ux * (d - 2.6), a);                               // 有幾站剛好有車靠站
+          }
+          stopAt -= len;
+        }
+      }
+    });
+    const grp = k.mesh(); scene.add(grp); crowd.push(grp);
   }
 
   // ---------- 寫在路面上的路名 ----------
@@ -983,7 +1003,8 @@
     const leaf = texTrees();
     colorOnly.push(standees(D.trees.filter((t) => !t[4]), 9, 14.5, 3, 2, leaf, 3.4));
     colorOnly.push(standees(D.trees.filter((t, i) => t[5] > 0 && i % 5 === 0), 9, 14.5, 3, 2, leaf, 3.4, (t) => 0.2 + t[5] * RISE));   // 山上只留一些樹
-    crowd.push(standees(D.people, 2.3, 4.6, 4, 1, texPeople(), 0.9));
+    crowd.push(standees(D.people.map((t, i) => [t[0], t[1], t[2], (i * 5 + t[3]) % 8]), 3.45, 4.6, 4, 2, texPeople(), 0.9));
+    traffic();
     roadNames(); lenses(); surveyBase();
     town.scale.y = Math.max(0.001, ease(grow));
     growers.forEach((m) => { m.uniforms.grow.value = ease(Math.max(0, grow * 1.4 - 0.4)); });
