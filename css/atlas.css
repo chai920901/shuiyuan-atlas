@@ -81,9 +81,9 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
 #atlas-panel h2 b { float: right; margin-right: 26px; font: 500 11px/1.6 "DM Mono", monospace; letter-spacing: .06em; }
 #set-close { position: absolute; right: 6px; top: 6px; width: 26px; height: 26px; font-size: 13px; }
 #set-time { width: 100%; accent-color: var(--red); }
-#set-weather { display: flex; gap: 6px; margin-top: 8px; }
-#set-weather button { flex: 1; padding: 6px 0; font-size: 12px; font-weight: 700; border: 1.5px solid var(--ink); }
-#set-weather button.on { background: var(--ink); color: var(--paper); }
+#set-weather, .set-pick { display: flex; gap: 6px; margin-top: 8px; }
+#set-weather button, .set-pick button { flex: 1; padding: 6px 0; font-size: 12px; font-weight: 700; border: 1.5px solid var(--ink); }
+#set-weather button.on, .set-pick button.on { background: var(--ink); color: var(--paper); }
 
 /* 測繪圖：乾淨的紙色背景，其他介面收起來；每層一條黑線 */
 #atlas.survey { background: #f8f5ee; }

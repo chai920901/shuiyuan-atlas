@@ -12,7 +12,7 @@
     wall: '#f3e8cb', deck: '#b9655a', pier: '#d8ccb2', key: '#d93a1e', key2: '#e9b44c',
     heroBlue: '#1a44c8', heroSky: '#2f8fe6', heroPink: '#d81b72', tint: '#d81b72',
   };
-  const PALETTE = [['paper', '紙底'], ['ink', '墨線'], ['sea', '水面'], ['wave', '水紋'], ['wood', '樹林／山'], ['lawn', '草地'], ['lawnLine', '草地條紋'],
+  const PALETTE = [['paper', '紙底'], ['ink', '墨線'], ['sea', '水面'], ['wave', '水紋'], ['hill', '山　底色'], ['wood', '山　圖案線條'], ['lawn', '草地'], ['lawnLine', '草地條紋'],
     ['major', '大馬路'], ['minor', '街道'], ['lane', '巷道'], ['foot', '步道'], ['wall', '建築'], ['tint', '市場周邊的房子'], ['deck', '高架橋'], ['key2', '地標／天橋'],
     ['heroBlue', '市場　深藍'], ['heroSky', '市場　淺藍'], ['heroPink', '市場　杜鵑']];
   const STORE = 'atlas-palette-' + S.id;
@@ -24,6 +24,13 @@
   const EDIT = location.protocol === 'file:' || /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
   if (EDIT) { try { Object.assign(C, JSON.parse(localStorage.getItem(STORE) || '{}')); } catch (e) { /* 讀不到就用檔案裡的 */ } }
   const mix = (a, b, k) => '#' + new THREE.Color(a).lerp(new THREE.Color(b), k).getHexString();
+  if (!LIVE.hill) LIVE.hill = mix(LIVE.wood, '#fffdf2', 0.8);                      // 山的底色沒設定時，由線條色調淡
+  if (!C.hill) C.hill = LIVE.hill;
+  // 山的圖案：wave 波紋、paver 斜格鋪面、loops 草葉小圈、stripes 橫條點線
+  const HILLS = [['wave', '波紋'], ['paver', '斜格'], ['loops', '草圈'], ['stripes', '橫條']];
+  let hillKind = STYLE.hillPattern || 'wave';
+  if (EDIT) { try { hillKind = localStorage.getItem(STORE + '-hill') || hillKind; } catch (e) { /* 用檔案裡的 */ } }
+  if (!HILLS.some((h) => h[0] === hillKind)) hillKind = 'wave';
   function derive() {                                                           // 由主色推出深淺變化
     C.woodDark = mix(C.wood, '#000000', 0.28); C.woodLight = mix(C.wood, '#ffffff', 0.25);
     C.walls = [C.wall, mix(C.wall, '#000000', 0.04), mix(C.wall, '#ffffff', 0.4), mix(C.wall, '#000000', 0.09)];
@@ -93,15 +100,37 @@
     }
   }), 30);
 
-  // 山與樹林：植栽配置圖裡的一種填紋——淡底上一排一排的波紋線
+  // 山與樹林：植栽配置圖的填紋，四種擇一（hillKind）。底色 C.hill，線條 C.wood
   const texWood = () => tile(sheet(256, 256, (g, w, h) => {
-    const pale = mix(C.wood, '#fffdf2', 0.8);
-    g.fillStyle = pale; g.fillRect(0, 0, w, h);
-    g.strokeStyle = mix(C.wood, pale, 0.25); g.lineWidth = 2.6; g.lineCap = 'round';
-    for (let y = 16; y < h; y += 32) {
-      g.beginPath();
-      for (let x = -4; x <= w + 4; x += 4) g.lineTo(x, y + Math.sin((x / 64) * Math.PI * 2 + (y / 32) * 1.7) * 5);
-      g.stroke();
+    g.fillStyle = C.hill; g.fillRect(0, 0, w, h);
+    g.strokeStyle = C.wood; g.lineCap = 'round';
+    if (hillKind === 'paver') {                                                 // 斜格鋪面：兩個方向的斜線，間距不等
+      g.lineWidth = 2.4; g.globalAlpha = 0.8;
+      [1, -1].forEach((dir) => {
+        for (let c = 0; c < w; c += 16 + Math.floor(rnd() * 3) * 8) {
+          for (let o = -w; o <= w; o += w) { g.beginPath(); g.moveTo(c + o, 0); g.lineTo(c + o + dir * w, h); g.stroke(); }
+        }
+      });
+      g.globalAlpha = 1;
+    } else if (hillKind === 'loops') {                                          // 草葉：一排一排的小圈
+      g.lineWidth = 1.7;
+      for (let y = 14, r = 0; y < h + 2; y += 16, r++) {
+        g.beginPath();
+        for (let x = (r % 2) * 4; x < w; x += 8) { const t = 9 + rnd() * 4; g.moveTo(x, y); g.bezierCurveTo(x + 1, y - t * 1.3, x + 7, y - t * 1.3, x + 5, y - 1); }
+        g.stroke();
+      }
+    } else if (hillKind === 'stripes') {                                        // 橫條：深淺相間，中間一條點線
+      for (let y = 0; y < h; y += 16) {
+        g.fillStyle = mix(C.hill, '#ffffff', 0.55); g.fillRect(0, y + 8, w, 8);
+        g.fillStyle = C.wood; for (let x = 2; x < w; x += 8) g.fillRect(x, y + 3, 3.4, 2);
+      }
+    } else {                                                                    // 波紋
+      g.lineWidth = 2.6;
+      for (let y = 16; y < h; y += 32) {
+        g.beginPath();
+        for (let x = -4; x <= w + 4; x += 4) g.lineTo(x, y + Math.sin((x / 64) * Math.PI * 2 + (y / 32) * 1.7) * 5);
+        g.stroke();
+      }
     }
   }), 30);
 
@@ -952,14 +981,14 @@
     // 調色
     if (!EDIT) return;                                                         // 發布出去的網站到這裡為止，沒有調色與輸出的介面
     panel.insertAdjacentHTML('beforeend', '<div id="set-edit"><h2>輸出</h2><button id="atlas-render" title="把現在的角度存成 PNG；按住 Shift 再按，背景透明">Render 存成 PNG</button>' +
-      '<p class="set-tip">存的是現在畫面的角度。按住 Shift 再按，背景是透明的。</p><h2>顏色</h2><div id="set-colors"></div><button id="set-reset">回到檔案裡的顏色</button>' +
+      '<p class="set-tip">存的是現在畫面的角度。按住 Shift 再按，背景是透明的。</p><h2>山的圖案</h2><div id="set-hill" class="set-pick"></div><h2>顏色</h2><div id="set-colors"></div><button id="set-reset">回到檔案裡的顏色</button>' +
       '<p class="set-tip">這一區只有在自己電腦上預覽時才會出現。調好之後跟 Claude 說「存顏色」，或按下面的按鈕複製，貼到 data/style.js 蓋掉原本的內容再上傳。</p>' +
       '<button id="set-copy">複製 style.js 的內容</button><textarea id="set-out" rows="5" readonly></textarea></div>');
     const list = document.getElementById('set-colors'), out = document.getElementById('set-out');
     document.getElementById('atlas-render').addEventListener('click', (e) => shot(e.shiftKey));
     const text = () => {
       const lines = PALETTE.concat([['slab', '底座側邊'], ['pier', '橋墩']]).map(([k, label]) => "    " + k + ": '" + C[k] + "',".padEnd(22) + '// ' + label);
-      return '// 網站的顏色與天氣。由頁面上的調色面板產生。時間不用設定，網站會跟著看的人當下的時刻走。\nwindow.ATLAS_STYLE = {\n  palette: {\n' + lines.join('\n') + '\n  },\n  weather: \'' + sky.weather + '\',\n};\n';
+      return '// 網站的顏色與天氣。由頁面上的調色面板產生。時間不用設定，網站會跟著看的人當下的時刻走。\nwindow.ATLAS_STYLE = {\n  palette: {\n' + lines.join('\n') + '\n  },\n  hillPattern: \'' + hillKind + '\',\n  weather: \'' + sky.weather + '\',\n};\n';
     };
     let wait = null;
     const inputs = {}, store = () => {
@@ -973,6 +1002,17 @@
       inp.type = 'color'; inp.value = C[key]; inputs[key] = inp;
       inp.addEventListener('input', () => { C[key] = inp.value; store(); clearTimeout(wait); wait = setTimeout(build, 140); });   // 改顏色：稍等一下再整張重畫
       row.append(inp, label); list.appendChild(row);
+    });
+    const hillBox = document.getElementById('set-hill');
+    HILLS.forEach(([k, label]) => {
+      const b = document.createElement('button');
+      b.textContent = label; b.classList.toggle('on', k === hillKind);
+      b.addEventListener('click', () => {
+        hillKind = k; [...hillBox.children].forEach((c) => c.classList.toggle('on', c === b));
+        try { localStorage.setItem(STORE + '-hill', k); } catch (e) { /* 只留在這一次 */ }
+        out.value = text(); build();
+      });
+      hillBox.appendChild(b);
     });
     out.value = text();
     document.getElementById('set-reset').addEventListener('click', () => {

@@ -18,7 +18,7 @@ window.ATLAS_STYLE = {
     sea: '#cfedf7',        // 水面的底色
     wave: '#39799d',       // 青海波的線
     // 綠地
-    wood: '#54875f',       // 樹林與隆起的山
+    wood: '#54875f',       // 山的圖案線條（山的底色沒另外設 hill 時，會由這一色調淡）
     lawn: '#c7d3a1',       // 草地的底色
     lawnLine: '#56b364',   // 草地的條紋
     // 道路
@@ -37,5 +37,6 @@ window.ATLAS_STYLE = {
     heroSky: '#2f8fe6',    // 淺藍：樓身、天橋欄杆
     heroPink: '#d81b72',   // 杜鵑：格子、色塊、人流與步行圈
   },
+  hillPattern: 'wave',     // 山的圖案：wave 波紋、paver 斜格、loops 草圈、stripes 橫條
   weather: 'sun',          // 天氣：sun 晴、cloud 多雲、grey 陰、rain 雨
 };
