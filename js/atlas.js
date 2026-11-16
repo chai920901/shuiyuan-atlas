@@ -20,7 +20,7 @@
   const STYLE = window.ATLAS_STYLE || {};
   const LIVE = Object.assign({}, BASE, STYLE.palette || {});
   const C = Object.assign({}, LIVE);
-  const EDIT = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) || /[?&]edit=1/.test(location.search);   // 調色面板只在自己電腦上預覽時出現
+  const EDIT = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);         // 調色面板只在自己電腦上預覽時出現，發布出去的網站沒有
   if (EDIT) { try { Object.assign(C, JSON.parse(localStorage.getItem(STORE) || '{}')); } catch (e) { /* 讀不到就用檔案裡的 */ } }
   const mix = (a, b, k) => '#' + new THREE.Color(a).lerp(new THREE.Color(b), k).getHexString();
   function derive() {                                                           // 由主色推出深淺變化
@@ -872,9 +872,11 @@
     document.getElementById('atlas-src').addEventListener('click', () => { src.hidden = !src.hidden; });
     document.getElementById('src-close').addEventListener('click', () => { src.hidden = true; });
     // 調色
-    const edit = document.getElementById('set-edit'), list = document.getElementById('set-colors'), out = document.getElementById('set-out');
-    edit.hidden = !EDIT;
-    if (!EDIT) return;
+    if (!EDIT) return;                                                         // 發布出去的網站到這裡為止，沒有調色的介面
+    panel.insertAdjacentHTML('beforeend', '<div id="set-edit"><h2>顏色</h2><div id="set-colors"></div><button id="set-reset">回到檔案裡的顏色</button>' +
+      '<p class="set-tip">這一區只有在自己電腦上預覽時才會出現。調好之後跟 Claude 說「存顏色」，或按下面的按鈕複製，貼到 data/style.js 蓋掉原本的內容再上傳。</p>' +
+      '<button id="set-copy">複製 style.js 的內容</button><textarea id="set-out" rows="5" readonly></textarea></div>');
+    const list = document.getElementById('set-colors'), out = document.getElementById('set-out');
     const text = () => {
       const lines = PALETTE.concat([['slab', '底座側邊'], ['pier', '橋墩']]).map(([k, label]) => "    " + k + ": '" + C[k] + "',".padEnd(22) + '// ' + label);
       return '// 網站的顏色、預設的時間與天氣。由頁面上的調色面板產生。\nwindow.ATLAS_STYLE = {\n  palette: {\n' + lines.join('\n') + '\n  },\n  time: ' + sky.time + ',\n  weather: \'' + sky.weather + '\',\n};\n';
