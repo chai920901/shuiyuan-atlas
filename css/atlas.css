@@ -38,7 +38,7 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
 
 /* 下方：作品清單 */
 #atlas-foot { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 0 max(10px, env(safe-area-inset-bottom)); pointer-events: none; }
-#atlas-meta { margin: 0; padding: 0 max(18px, env(safe-area-inset-left)); display: flex; justify-content: space-between; gap: 12px;
+#atlas-meta { pointer-events: none; margin: 0; padding: 0 max(18px, env(safe-area-inset-left)); display: flex; justify-content: space-between; gap: 12px;
   font: 400 9px/1.5 "DM Mono", "Noto Sans TC", monospace; letter-spacing: .08em; opacity: .7; }
 
 /* Render 的成品預覽 */
@@ -71,7 +71,7 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
   background-size: 34px 120px; animation: rain .5s linear infinite; }
 #atlas[data-weather="rain"] #atlas-rain { opacity: .55; }
 @keyframes rain { to { background-position: -26px 120px; } }
-#atlas.night #atlas-place, #atlas.night #atlas-name-en, #atlas.night #atlas-meta { color: #efe7d2; }
+#atlas.night #atlas-place, #atlas.night #atlas-name-en, #atlas.night #atlas-meta { pointer-events: none; color: #efe7d2; }
 
 /* 設定面板 */
 #atlas-panel { position: absolute; right: max(16px, env(safe-area-inset-right)); top: 64px; z-index: 4; width: 250px; max-height: calc(100% - 110px);
@@ -95,12 +95,47 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
 #floor-list button { min-width: 52px; padding: 5px 10px; font: 700 12px/1.3 "DM Mono", "Noto Sans TC", monospace; letter-spacing: .06em;
   background: var(--paper); border: 1.5px solid var(--ink); }
 #floor-list button.on { background: var(--red); color: #fff7ea; }
-#floor-card { position: fixed; left: max(16px, env(safe-area-inset-left)); bottom: 96px; width: min(300px, calc(100vw - 32px)); padding: 12px 14px;
-  background: var(--paper); border: 1.5px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); }
-#floor-name { margin: 0 0 6px; font-size: 16px; font-weight: 900; letter-spacing: .06em; }
-#floor-text { margin: 0; font-size: 12px; line-height: 1.7; }
 #floor-close { width: 28px; height: 28px; margin-bottom: 4px; font-size: 13px; background: var(--paper); border: 1.5px solid var(--ink); }
 #atlas.bare #atlas-floors { display: none; }
+
+/* 測繪圖：乾淨的紙色背景，其他介面收起來；每層一條黑線 */
+#atlas.survey { background: #f8f5ee; }
+#atlas.survey #atlas-sky, #atlas.survey #atlas-rain, #atlas.survey #atlas-tags, #atlas.survey #atlas-lens, #atlas.survey #lens-note { display: none; }
+#survey-tags { position: absolute; inset: 0; pointer-events: none; overflow: hidden; display: none; }
+#atlas.survey #survey-tags { display: block; }
+#atlas.bare #survey-tags { display: none; }
+.leader { position: absolute; left: 0; top: 0; pointer-events: auto; text-align: left; }
+.leader i { position: absolute; left: 4px; top: 0; height: 0; width: 0; border-top: 1.5px solid #111; transition: width .5s ease var(--wait, 0s); }
+.leader i::before { content: ""; position: absolute; left: -4px; top: -4px; width: 6px; height: 6px; border-radius: 50%; background: #111; }
+.leader span { position: absolute; left: clamp(40px, 9vw, 110px); bottom: -9px; width: max-content; max-width: min(240px, 42vw); padding-left: 8px;
+  opacity: 0; transition: opacity .4s ease calc(var(--wait, 0s) + .35s); color: #111; }
+.leader b { display: block; font-size: 12px; font-weight: 900; letter-spacing: .06em; line-height: 1.5; white-space: nowrap; }
+.leader em { display: none; font-style: normal; font-size: 11px; line-height: 1.6; }
+#survey-tags.on .leader i { width: clamp(36px, 9vw, 106px); }
+#survey-tags.on .leader span { opacity: 1; }
+.leader.pick b { color: var(--red); font-size: 14px; }
+.leader.pick em { display: block; }
+.leader.pick i { border-top-width: 2.5px; }
+
+/* 資料來源 */
+#atlas-src { font: inherit; letter-spacing: inherit; text-decoration: underline; pointer-events: auto; }
+#atlas-sources { position: absolute; right: max(16px, env(safe-area-inset-right)); bottom: 56px; z-index: 4; width: min(360px, calc(100vw - 32px));
+  max-height: 60%; overflow-y: auto; padding: 14px 16px; background: var(--paper); border: 1.5px solid var(--ink); box-shadow: 5px 5px 0 var(--ink); }
+#atlas-sources[hidden] { display: none; }
+#atlas-sources h2 { margin: 0 0 8px; font-size: 13px; font-weight: 900; letter-spacing: .16em; }
+#atlas-sources ul { margin: 0; padding-left: 16px; font-size: 11px; line-height: 1.8; }
+#atlas-sources a { color: var(--ink); font-weight: 700; }
+#src-close { position: absolute; right: 6px; top: 6px; width: 26px; height: 26px; font-size: 13px; }
+
+/* 調色（只在自己電腦上出現） */
+#set-edit[hidden] { display: none; }
+#set-edit h2 { margin-top: 16px !important; padding-top: 12px; border-top: 1.5px solid var(--ink); }
+#set-colors { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
+#set-colors label { display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 500; cursor: pointer; }
+#set-colors input { flex: none; width: 26px; height: 26px; padding: 0; border: 1.5px solid var(--ink); background: none; cursor: pointer; }
+#set-copy { margin-top: 0; width: 100%; padding: 7px 0; font-size: 12px; font-weight: 700; letter-spacing: .1em; border: 1.5px solid var(--ink); background: var(--red); color: #fff7ea; }
+#set-out { width: 100%; margin-top: 8px; font: 400 10px/1.4 "DM Mono", monospace; border: 1.5px solid var(--ink); background: #fff; resize: vertical; }
+.set-tip { margin: 12px 0 8px; font-size: 11px; line-height: 1.6; opacity: .8; }
 
 /* 分析模式：下方一排按鈕，上面一行說明 */
 #atlas-lens { display: flex; gap: 8px; padding: 6px max(16px, env(safe-area-inset-left)) 8px; overflow-x: auto; pointer-events: auto; scrollbar-width: none; }

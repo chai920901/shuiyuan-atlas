@@ -53,7 +53,7 @@
     </header>
     <nav id="atlas-tools">
       <button id="atlas-render" title="把現在的角度存成 PNG；按住 Shift 再按，背景透明">Render</button>
-      <button id="atlas-floor-btn">樓層介紹</button>
+      <button id="atlas-floor-btn">樓層測繪圖</button>
       <button id="atlas-set">時間・天氣</button>
       <button id="atlas-turn">轉 90°</button>
       <button id="atlas-top">俯視</button>
@@ -66,6 +66,14 @@
       <h2>時間與天氣 <b id="set-clock"></b></h2>
       <input id="set-time" type="range" min="0" max="23.75" step="0.25">
       <div id="set-weather"></div>
+      <div id="set-edit" hidden>
+        <h2>顏色</h2>
+        <div id="set-colors"></div>
+        <button id="set-reset">回到檔案裡的顏色</button>
+        <p class="set-tip">這一區只有在自己電腦上預覽時才會出現。調好之後跟 Claude 說「存顏色」，或按下面的按鈕複製，貼到 data/style.js 蓋掉原本的內容再上傳。</p>
+        <button id="set-copy">複製 style.js 的內容</button>
+        <textarea id="set-out" rows="5" readonly></textarea>
+      </div>
     </aside>
 
     <!-- Render 的成品：先給人看，再存檔 -->
@@ -82,27 +90,31 @@
       </div>
     </aside>
 
-    <!-- 樓層介紹：左邊一排樓層，選了之後主體從那一層以上掀開 -->
+    <!-- 測繪圖：左邊一排樓層，圖上每一層拉一條黑線寫用途 -->
     <aside id="atlas-floors" hidden>
-      <button id="floor-close" aria-label="關閉">✕</button>
+      <button id="floor-close" aria-label="回到地圖">✕</button>
       <nav id="floor-list"></nav>
-      <div id="floor-card">
-        <h2 id="floor-name"></h2>
-        <p id="floor-text"></p>
-      </div>
+    </aside>
+    <div id="survey-tags"></div>
+
+    <!-- 資料來源 -->
+    <aside id="atlas-sources" hidden>
+      <button id="src-close" aria-label="關閉">✕</button>
+      <h2>資料來源</h2>
+      <ul id="src-list"></ul>
     </aside>
 
     <footer id="atlas-foot">
       <p id="lens-note" hidden></p>
       <nav id="atlas-lens"></nav>
-      <p id="atlas-meta"><span>拖曳旋轉　·　滾輪或雙指縮放　·　WASD 移動　·　Q / E 旋轉　·　Esc 隱藏文字</span><span><span id="atlas-count"></span>　地圖資料 © OpenStreetMap</span></p>
+      <p id="atlas-meta"><span>拖曳旋轉　·　滾輪或雙指縮放　·　WASD 移動　·　Q / E 旋轉　·　點水源市場看樓層　·　Esc 隱藏文字</span><span><span id="atlas-count"></span>　<button id="atlas-src">資料來源</button></span></p>
     </footer>
   </main>
 
   <script src="vendor/three.min.js"></script>
   <script src="data/atlas.js"></script>
-  <script src="data/site.js"></script>
-  <script src="data/style.js"></script>
+  <!-- 這兩個檔案常改，加上時間戳記，免得瀏覽器拿到舊的 -->
+  <script>document.write('<script src="data/site.js?t=' + Date.now() + '"><\/script><script src="data/style.js?t=' + Date.now() + '"><\/script>');</script>
   <script src="js/atlas.js"></script>
 </body>
 </html>

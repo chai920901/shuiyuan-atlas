@@ -20,6 +20,8 @@
   const STYLE = window.ATLAS_STYLE || {};
   const LIVE = Object.assign({}, BASE, STYLE.palette || {});
   const C = Object.assign({}, LIVE);
+  const EDIT = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) || /[?&]edit=1/.test(location.search);   // 調色面板只在自己電腦上預覽時出現
+  if (EDIT) { try { Object.assign(C, JSON.parse(localStorage.getItem(STORE) || '{}')); } catch (e) { /* 讀不到就用檔案裡的 */ } }
   const mix = (a, b, k) => '#' + new THREE.Color(a).lerp(new THREE.Color(b), k).getHexString();
   function derive() {                                                           // 由主色推出深淺變化
     C.woodDark = mix(C.wood, '#000000', 0.28); C.woodLight = mix(C.wood, '#ffffff', 0.25);
@@ -40,11 +42,12 @@
   renderer.shadowMap.type = T.PCFSoftShadowMap;
   renderer.shadowMap.autoUpdate = false;
   renderer.localClippingEnabled = true;                                         // 樓層介紹要把主體從某一層以上切掉
-  const CUT = new T.Plane(new T.Vector3(0, -1, 0), 9999);                      // 只留下這個高度以下的部分
+  const slices = [];                                                            // 主體切成一層一片，爆炸圖時各自往上移
+  let heroSrc = [], skyHolder = null, survey = false, floorAt = -1;
   const scene = new T.Scene();
   const camera = new T.OrthographicCamera(-1, 1, 1, -1, 1, 6000);
   const HOME = { az: -0.62, el: 0.66 };
-  const view = { az: HOME.az, el: HOME.el, size: 420, tx: 0, tz: 0 };
+  const view = { az: HOME.az, el: HOME.el, size: 420, tx: 0, tz: 0, ty: 0 };
   let dirty = true, grow = 0, tween = null, fit = 420;
 
   // ---------- 紋理 ----------
@@ -368,17 +371,17 @@
     const solid = new T.Mesh(mass((b) => !b.hero, false), solidMat);            // 標準：不透明的量體
     const tall = new T.Mesh(mass((b) => !b.hero, false, true), fill(new T.MeshLambertMaterial({ vertexColors: true, map: panel, side: T.DoubleSide })));   // 分析：依高度上色
     const heroEdge = [], main = heroMesh(D.buildings.find((b) => b.hero), heroEdge);   // 主體：自己一組稜線，樓層介紹時才能一起切掉
-    main.material.clippingPlanes = [CUT];
     const hg = new T.BufferGeometry();
     hg.setAttribute('position', new T.Float32BufferAttribute(heroEdge, 3));
-    const heroLines = new T.LineSegments(hg, ink(0.8)); heroLines.material.clippingPlanes = [CUT]; heroLines.renderOrder = 3;
+    const heroLines = new T.LineSegments(hg, ink(0.8)); heroLines.renderOrder = 3;
+    heroSrc = [main, heroLines];
     [solid, main, tall].forEach((m) => { m.castShadow = m.receiveShadow = true; });
     solidOnly.push(solid); heightOnly.push(tall);
     const eg = new T.BufferGeometry();
     eg.setAttribute('position', new T.Float32BufferAttribute(edge, 3));
     const lines = new T.LineSegments(eg, ink(0.8));
     lines.renderOrder = 3;
-    town = new T.Group(); town.add(solid, tall, main, heroLines, lines); scene.add(town);
+    town = new T.Group(); town.add(solid, tall, lines); scene.add(town);
     heroRing = D.buildings.find((b) => b.hero).p;
     roofs();
   }
@@ -520,10 +523,10 @@
     // 每一層的樓板和一點室內：市場是一格一格的攤位，辦公樓層是隔間，劇場是舞台和階梯座位。平常藏在樓裡，樓層介紹切開才看得到
     const tones = { market: mix(pink, '#ffffff', 0.78), office: '#e3ecf7', theatre: '#e6dcf0' };
     const stall = [soft, '#f1d98a', '#9fd3c7', white, '#f29a6b', lilac];
-    const plate = new T.Shape(ring.map((q) => new T.Vector2(q[0], q[1])));
+    const plate = new T.Shape(ring.map((q) => new T.Vector2(q[0], q[1]))), plates = [];
     FLOORS.forEach((f, n) => {
-      const m = new T.Mesh(up(new T.ShapeGeometry(plate)), fill(new T.MeshLambertMaterial({ color: tones[f.kind] || tones.office, clippingPlanes: [CUT] })));
-      m.position.y = f.from + 0.08; m.receiveShadow = true; town.add(m);
+      const m = new T.Mesh(up(new T.ShapeGeometry(plate)), fill(new T.MeshLambertMaterial({ color: tones[f.kind] || tones.office })));
+      m.position.y = f.from + 0.08; m.receiveShadow = true; plates.push(m);
       if (f.kind === 'market') {
         let i = n;
         for (let u = -22; u <= 22; u += 4.6) for (let v = -22; v <= 22; v += 4.6) {
@@ -538,9 +541,16 @@
         for (let u = -15; u <= 15; u += 7) for (let v = -8; v <= 8; v += 5.5) if (ok(u, v, 1.2, 0.7)) { const q = at(u, v); k.tone('#d9c3a0'); k.box(q[0], q[1], ang, 1.2, 0.7, f.from + 0.1, f.from + 0.85); }
       }
     });
-    const grp = k.mesh();
-    grp.children.forEach((c) => { c.material.clippingPlanes = [CUT]; });
-    town.add(grp); roofOnly.push(grp);
+    const grp = k.mesh(), src = heroSrc.concat(grp.children);
+    const levels = FLOORS.length ? FLOORS.map((f, i) => ({ from: i ? f.from : -5, to: i === FLOORS.length - 1 ? f.to - 0.02 : f.to, mid: (f.from + f.to) / 2 })) : [{ from: -5, to: h - 0.02, mid: h / 2 }];
+    levels.push({ from: h - 0.02, to: 9999, mid: h + 3 });                      // 最上面一片是屋頂
+    levels.forEach((lv, i) => {
+      const g = new T.Group(), lo = new T.Plane(new T.Vector3(0, 1, 0), 0), hi = new T.Plane(new T.Vector3(0, -1, 0), 0);
+      src.forEach((o) => { const c = o.clone(); c.material = o.material.clone(); c.material.clippingPlanes = [lo, hi]; c.castShadow = o.castShadow && i === 0; g.add(c); });
+      if (plates[i]) g.add(plates[i]);
+      town.add(g); slices.push({ g, lo, hi, from: lv.from, to: lv.to, mid: lv.mid, at: 0 });
+    });
+    layoutHero(1);
   }
 
   // ---------- 天橋：從市場二樓接出去，跨過羅斯福路。橋面、欄杆、橋墩、兩端的樓梯 ----------
@@ -574,8 +584,8 @@
       k.tone(rail); [[s - 1.3, 0], [s + 4.1, 2.8]].forEach(([e]) => { const r = at(e, dir * (W + 2.6 + half * run / 2)); k.box(r[0], r[1], ang, 0.05, half * run / 2, H * 0.75 + 0.9, H * 0.75 + 1.0); });
     };
     stairs(len - 1.5, 1); stairs(len - 1.5, -1); stairs(6.5, -1);                                    // 對街兩座，市場門口一座
-    const grp = k.mesh();
-    town.add(grp);
+    skyHolder = k.mesh();
+    town.add(skyHolder);
   }
 
   // ---------- 橋：高架橋與天橋。橋面是一條有厚度的帶子，下面每隔一段立橋墩 ----------
@@ -785,7 +795,8 @@
     window.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape') return;
       const box = document.getElementById('atlas-shot');
-      if (!box.hidden) { box.hidden = true; return; }                         // 輸出預覽開著時，Esc 先關掉它
+      if (!box.hidden) { box.hidden = true; return; }
+      if (survey) { setSurvey(false); return; }                               // 測繪圖開著時，Esc 先回到地圖                         // 輸出預覽開著時，Esc 先關掉它
       bare = stage.classList.toggle('bare');
       setMode(mode);
     });
@@ -823,7 +834,7 @@
     else if (dull) { top = mix('#e4e6e6', '#f2c9a4', low * 0.5); bottom = '#b7bec6'; }
     else { top = mix(top, '#ffdcb4', low); bottom = mix(bottom, '#f0a184', low); }
     skyTop = top;
-    stage.style.background = 'radial-gradient(120% 90% at 50% 40%, ' + top + ' 0%, ' + bottom + ' 100%)';
+    stage.style.background = survey ? '' : 'radial-gradient(120% 90% at 50% 40%, ' + top + ' 0%, ' + bottom + ' 100%)';
     stage.classList.toggle('night', !day);
     stage.dataset.weather = sky.weather;
     const orb = document.getElementById(day ? 'sky-sun' : 'sky-moon'), other = document.getElementById(day ? 'sky-moon' : 'sky-sun');
@@ -850,6 +861,44 @@
       b.addEventListener('click', () => { sky.weather = k; [...wx.children].forEach((c) => c.classList.toggle('on', c === b)); applySky(); });
       wx.appendChild(b);
     });
+    // 資料來源
+    const src = document.getElementById('atlas-sources'), srcList = document.getElementById('src-list');
+    (S.sources || []).forEach((it) => {
+      const li = document.createElement('li'), a = document.createElement(it.url ? 'a' : 'b');
+      a.textContent = it.label; if (it.url) { a.href = it.url; a.target = '_blank'; a.rel = 'noopener'; }
+      li.appendChild(a); if (it.note) li.appendChild(document.createTextNode('　' + it.note));
+      srcList.appendChild(li);
+    });
+    document.getElementById('atlas-src').addEventListener('click', () => { src.hidden = !src.hidden; });
+    document.getElementById('src-close').addEventListener('click', () => { src.hidden = true; });
+    // 調色
+    const edit = document.getElementById('set-edit'), list = document.getElementById('set-colors'), out = document.getElementById('set-out');
+    edit.hidden = !EDIT;
+    if (!EDIT) return;
+    const text = () => {
+      const lines = PALETTE.concat([['slab', '底座側邊'], ['pier', '橋墩']]).map(([k, label]) => "    " + k + ": '" + C[k] + "',".padEnd(22) + '// ' + label);
+      return '// 網站的顏色、預設的時間與天氣。由頁面上的調色面板產生。\nwindow.ATLAS_STYLE = {\n  palette: {\n' + lines.join('\n') + '\n  },\n  time: ' + sky.time + ',\n  weather: \'' + sky.weather + '\',\n};\n';
+    };
+    let wait = null;
+    const inputs = {}, store = () => {
+      const saved = {};
+      PALETTE.forEach(([k]) => { if (C[k] !== LIVE[k]) saved[k] = C[k]; });
+      try { localStorage.setItem(STORE, JSON.stringify(saved)); } catch (e) { /* 存不了就只留在這一次 */ }
+      out.value = text();
+    };
+    PALETTE.forEach(([key, label]) => {
+      const row = document.createElement('label'), inp = document.createElement('input');
+      inp.type = 'color'; inp.value = C[key]; inputs[key] = inp;
+      inp.addEventListener('input', () => { C[key] = inp.value; store(); clearTimeout(wait); wait = setTimeout(build, 140); });   // 改顏色：稍等一下再整張重畫
+      row.append(inp, label); list.appendChild(row);
+    });
+    out.value = text();
+    document.getElementById('set-reset').addEventListener('click', () => {
+      PALETTE.forEach(([k]) => { C[k] = LIVE[k]; inputs[k].value = LIVE[k]; });
+      try { localStorage.removeItem(STORE); } catch (e) { /* 沒關係 */ }
+      out.value = text(); build();
+    });
+    document.getElementById('set-copy').addEventListener('click', () => { out.select(); if (navigator.clipboard) navigator.clipboard.writeText(out.value).catch(() => {}); });
   }
 
   // ---------- 整張圖重畫：第一次、以及每次換顏色之後 ----------
@@ -863,6 +912,7 @@
         if (m) { if (m.map) m.map.dispose(); if (m.uniforms && m.uniforms.map) m.uniforms.map.value.dispose(); m.dispose(); }
       });
     });
+    slices.length = 0;
     [fills, inks, solidOnly, heightOnly, roofOnly, crowd, colorOnly, growers, words, blobs, lensObj.walk, lensObj.car, lensObj.height, lensObj.reach].forEach((a) => { a.length = 0; });
     flock.length = 0;
     derive(); seed = 11;
@@ -872,38 +922,100 @@
     colorOnly.push(standees(D.trees.filter((t) => !t[4]), 9, 14.5, 3, 2, leaf, 3.4));
     colorOnly.push(standees(D.trees.filter((t, i) => t[5] > 0 && i % 5 === 0), 9, 14.5, 3, 2, leaf, 3.4, (t) => 0.2 + t[5] * RISE));   // 山上只留一些樹
     crowd.push(standees(D.people, 2.3, 4.6, 4, 1, texPeople(), 0.9));
-    roadNames(); lenses();
+    roadNames(); lenses(); surveyBase();
     town.scale.y = Math.max(0.001, ease(grow));
     growers.forEach((m) => { m.uniforms.grow.value = ease(Math.max(0, grow * 1.4 - 0.4)); });
     setMode(mode);
+    if (survey) { survey = false; setSurvey(true); }                          // 重畫之後回到測繪圖
   }
 
-  // ---------- 樓層介紹：選一層，主體從這一層的天花板以上切掉，露出這一層的樓板 ----------
-  let floorAt = -1;
-  function setFloor(i) {
-    floorAt = i;
-    const f = FLOORS[i];
-    CUT.constant = f ? f.to + 0.02 : 9999;
-    [...document.getElementById('floor-list').children].forEach((b) => b.classList.toggle('on', +b.dataset.i === i));
-    document.getElementById('floor-name').textContent = f ? f.id + '　' + f.name : '整棟';
-    document.getElementById('floor-text').textContent = f ? f.text : '選一層樓，上面的樓層會掀開，看到這一層裡面有什麼。';
-    dirty = true;
-  }
-  function floorsUi() {
-    const box = document.getElementById('atlas-floors'), list = document.getElementById('floor-list'), hero = S.notes.find((n) => n.mark === 'main');
-    if (!FLOORS.length || !hero) { document.getElementById('atlas-floor-btn').hidden = true; return; }
-    const add = (label, i) => { const b = document.createElement('button'); b.textContent = label; b.dataset.i = i; b.addEventListener('click', () => setFloor(i)); list.appendChild(b); };
-    add('整棟', -1);
-    for (let i = FLOORS.length - 1; i >= 0; i--) add(FLOORS[i].id, i);         // 高樓層在上面
-    document.getElementById('atlas-floor-btn').addEventListener('click', () => {
-      box.hidden = !box.hidden;
-      if (box.hidden) { setFloor(-1); return; }
-      setMode('a', 'map'); setFloor(floorAt);
-      view.az = ((view.az - 2.1 + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI + 2.1;
-      fly({ tx: hero.at.x, tz: -hero.at.y, size: 62, az: 2.1, el: 0.6 });      // 轉到看得到正面和天橋的角度
+  // ---------- 測繪圖：點水源市場，其他東西收起來，主體一層一層拉開成爆炸圖，每一層拉一條黑線寫用途 ----------
+  const GAP = 7, EXTRA = 13;                                                    // 每層之間拉開幾公尺；選中的那一層上面再多拉開一點
+  function layoutHero(k) {                                                      // 把每一片移到該在的高度；k 是這一格要靠近目標多少（1 = 直接到位）
+    let moving = false;
+    slices.forEach((sl, i) => {
+      const want = survey ? i * GAP + (floorAt >= 0 && i > floorAt ? EXTRA : 0) : 0;
+      sl.at += (want - sl.at) * k;
+      if (Math.abs(want - sl.at) < 0.02) sl.at = want; else moving = true;
+      sl.g.position.y = sl.at;
+      const open = grow < 1;                                                   // 開場動畫時先不切，整棟一起長高
+      sl.lo.constant = open ? 9999 : -(sl.from + sl.at); sl.hi.constant = open ? 9999 : sl.to + sl.at;
     });
-    document.getElementById('floor-close').addEventListener('click', () => { box.hidden = true; setFloor(-1); });
-    setFloor(-1);
+    if (skyHolder && slices[1]) skyHolder.position.y = slices[1].at;           // 天橋跟著二樓走
+    return moving;
+  }
+  let before = null;
+  const base = [];                                                              // 測繪圖底下的那塊底板
+  function setSurvey(on) {
+    if (on === survey || !slices.length) return;
+    survey = on;
+    const hero = S.notes.find((n) => n.mark === 'main'), keep = slices.map((sl) => sl.g).concat(skyHolder ? [skyHolder] : []);
+    scene.children.forEach((o) => { if (!o.isLight && o !== sun.target && o !== town) o.visible = !on; });
+    town.children.forEach((o) => { o.visible = !on || keep.includes(o); });
+    base.forEach((o) => { o.visible = on; });
+    stage.classList.toggle('survey', on);
+    document.getElementById('atlas-floors').hidden = !on;
+    document.getElementById('atlas-floor-btn').textContent = on ? '回到地圖' : '樓層測繪圖';
+    if (on) {
+      before = { tx: view.tx, tz: view.tz, ty: 0, size: view.size, az: view.az, el: view.el };
+      const asp = stage.clientWidth / stage.clientHeight, size = Math.max(84, 62 / asp), az = 1.75, shift = Math.min(size * asp * 0.3, 34);
+      view.az = ((view.az - az + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI + az;
+      fly({ tx: hero.at.x + Math.cos(az) * shift, tz: -hero.at.y - Math.sin(az) * shift, ty: 52, size, az, el: 0.6155 });   // 等角：俯角 35.26 度
+      setTimeout(() => { if (survey) document.getElementById('survey-tags').classList.add('on'); }, 500);
+    } else {
+      setMode(mode, lens);
+      document.getElementById('survey-tags').classList.remove('on');
+      floorAt = -1; markFloor();
+      if (before) fly(before);
+    }
+    applySky();
+  }
+  function markFloor() {
+    [...document.getElementById('floor-list').children].forEach((b) => b.classList.toggle('on', +b.dataset.i === floorAt));
+    [...document.getElementById('survey-tags').children].forEach((b) => b.classList.toggle('pick', +b.dataset.i === floorAt));
+  }
+  function setFloor(i) { floorAt = i === floorAt ? -1 : i; markFloor(); dirty = true; }
+  const leaders = [];
+  function floorsUi() {
+    const list = document.getElementById('floor-list'), tagBox = document.getElementById('survey-tags'), hero = S.notes.find((n) => n.mark === 'main');
+    if (!FLOORS.length || !hero) { document.getElementById('atlas-floor-btn').hidden = true; return; }
+    const rows = FLOORS.map((f, i) => ({ i, id: f.id, name: f.name, text: f.text })).concat([{ i: FLOORS.length, id: 'RF', name: '屋頂', text: S.roofText || '機房、水塔、太陽能板。' }]);
+    rows.slice().reverse().forEach((r) => {                                    // 高樓層在上面
+      const b = document.createElement('button');
+      b.textContent = r.id; b.dataset.i = r.i; b.addEventListener('click', () => setFloor(r.i)); list.appendChild(b);
+    });
+    rows.forEach((r) => {                                                      // 每層一條黑線加說明
+      const el = document.createElement('button');
+      el.className = 'leader'; el.dataset.i = r.i; el.style.setProperty('--wait', r.i * 0.05 + 's');
+      el.innerHTML = '<i></i><span><b>' + r.id + '　' + r.name + '</b><em>' + r.text + '</em></span>';
+      el.addEventListener('click', () => setFloor(r.i));
+      tagBox.appendChild(el); leaders.push(el);
+    });
+    document.getElementById('atlas-floor-btn').addEventListener('click', () => setSurvey(!survey));
+    document.getElementById('floor-close').addEventListener('click', () => setSurvey(false));
+  }
+  function placeLeaders() {                                                     // 黑線的起點：這一層在畫面上最靠右的那個角
+    if (!survey || !heroRing) return;
+    const w = stage.clientWidth, h = stage.clientHeight;
+    leaders.forEach((el, i) => {
+      const sl = slices[i];
+      if (!sl) return;
+      let bx = -1e9, by = 0;
+      heroRing.forEach((q) => { v.set(q[0], sl.mid + sl.at, -q[1]).project(camera); const x = (v.x + 1) / 2 * w; if (x > bx) { bx = x; by = (1 - v.y) / 2 * h; } });
+      el.style.transform = 'translate(' + bx.toFixed(1) + 'px,' + by.toFixed(1) + 'px)';
+    });
+  }
+  function surveyBase() {                                                       // 測繪圖用的底板：一個圓盤加一圈墨線
+    base.length = 0;
+    const hero = S.notes.find((n) => n.mark === 'main');
+    if (!hero) return;
+    const disc = new T.Mesh(up(new T.CircleGeometry(74, 72)), new T.MeshLambertMaterial({ color: mix(C.paper, '#ffffff', 0.35) }));
+    disc.position.set(hero.at.x, 0.3, -hero.at.y); disc.receiveShadow = true;
+    const pts = [];
+    for (let k = 0; k < 96; k++) { const a0 = (k / 96) * Math.PI * 2, a1 = ((k + 1) / 96) * Math.PI * 2; pts.push(hero.at.x + Math.cos(a0) * 74, 0.4, -hero.at.y + Math.sin(a0) * 74, hero.at.x + Math.cos(a1) * 74, 0.4, -hero.at.y + Math.sin(a1) * 74); }
+    const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pts, 3));
+    const ringLine = new T.LineSegments(g, new T.LineBasicMaterial({ color: C.ink }));
+    [disc, ringLine].forEach((o) => { o.visible = survey; scene.add(o); base.push(o); });
   }
 
   // ---------- 分析模式（lens）。量體永遠是標準的不透明樣子，只有「建築高度」會換成依高度上色 ----------
@@ -1060,7 +1172,8 @@
     view.tx = Math.max(-HW, Math.min(HW, view.tx)); view.tz = Math.max(-HH, Math.min(HH, view.tz));
     camera.left = -view.size * asp; camera.right = view.size * asp; camera.top = view.size; camera.bottom = -view.size;
     camera.position.set(view.tx + Math.sin(view.az) * Math.cos(el) * 2600, Math.sin(el) * 2600, view.tz + Math.cos(view.az) * Math.cos(el) * 2600);
-    camera.lookAt(view.tx, 0, view.tz);
+    camera.position.y += view.ty;
+    camera.lookAt(view.tx, view.ty, view.tz);
     camera.updateProjectionMatrix(); camera.updateMatrixWorld();
     return true;
   }
@@ -1073,7 +1186,7 @@
     return Math.max(my + 60, mx / asp) * 1.06;
   }
   function fly(to) {
-    const from = { az: view.az, el: view.el, size: view.size, tx: view.tx, tz: view.tz };
+    const from = { az: view.az, el: view.el, size: view.size, tx: view.tx, tz: view.tz, ty: view.ty || 0 };
     if (!isFinite(from.size)) from.size = fit = fitSize();
     if (!isFinite(from.size)) return;
     tween = { from, to, t: 0 };
@@ -1104,7 +1217,8 @@
       const turn = (keys.has('q') ? 1 : 0) - (keys.has('e') ? 1 : 0);
       if (dx || dy || turn) { pan(dx * v, dy * v); view.az += turn * dt * 1.2; tween = null; dirty = true; }
     }
-    if (dirty && frame()) { dirty = false; renderer.render(scene, camera); place(); }
+    if (layoutHero(Math.min(1, dt * 6))) dirty = true;                        // 樓層還在移動就繼續畫
+    if (dirty && frame()) { dirty = false; renderer.render(scene, camera); place(); placeLeaders(); }
     requestAnimationFrame(loop);
   }
 
@@ -1142,7 +1256,15 @@
       dirty = true;
     });
     const end = (e) => { pts.delete(e.pointerId); if (pts.size < 2) gap = 0; };
-    canvas.addEventListener('pointerup', end);
+    const ray = new T.Raycaster(), tap = new T.Vector2();
+    canvas.addEventListener('pointerup', (e) => {                              // 沒拖動的點一下：點到水源市場就進測繪圖
+      end(e);
+      if (moved > 6 || survey || !slices.length) return;
+      const r = canvas.getBoundingClientRect();
+      tap.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+      ray.setFromCamera(tap, camera);
+      if (ray.intersectObjects(slices.map((sl) => sl.g.children[0])).length) setSurvey(true);
+    });
     canvas.addEventListener('pointercancel', end);
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     canvas.addEventListener('wheel', (e) => { e.preventDefault(); view.size *= Math.exp(e.deltaY * 0.0012); tween = null; dirty = true; }, { passive: false });
@@ -1172,7 +1294,7 @@
     view.size = fit;
     document.getElementById('atlas-count').textContent = D.buildings.length + ' 棟建築　' + D.trees.length + ' 棵樹　' + D.people.length + ' 個人';
     requestAnimationFrame(loop);
-    window.ATLAS = { view, fly, setMode, setFloor, sky, applySky, redraw: () => { dirty = true; } };          // 給主控台用：ATLAS.fly({ tx, tz, size, az, el })
+    window.ATLAS = { view, fly, setMode, setFloor, setSurvey, palette: () => PALETTE.reduce((o, [k]) => { o[k] = C[k]; return o; }, {}), sky, applySky, redraw: () => { dirty = true; } };          // 給主控台用：ATLAS.fly({ tx, tz, size, az, el })
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { dirty = true; });
   }
   start();
