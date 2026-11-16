@@ -51,9 +51,8 @@
       <p id="atlas-sub"></p>
     </header>
     <nav id="atlas-tools">
-      <button id="atlas-render" class="admin-only" title="把現在的角度存成 PNG；按住 Shift 再按，背景透明">Render</button>
+      <button id="atlas-render" title="把現在的角度存成 PNG；按住 Shift 再按，背景透明">Render</button>
       <button id="atlas-set">時間・天氣</button>
-      <button id="atlas-mode" class="admin-only" title="切換風格，也可以按鍵盤 1、2、3">風格：標準</button>
       <button id="atlas-turn">轉 90°</button>
       <button id="atlas-top">俯視</button>
       <button id="atlas-home">回到全圖</button>
@@ -65,16 +64,6 @@
       <h2>時間與天氣 <b id="set-clock"></b></h2>
       <input id="set-time" type="range" min="0" max="23.75" step="0.25">
       <div id="set-weather"></div>
-      <div class="admin-only">
-        <h2>顏色</h2>
-        <div id="set-colors"></div>
-        <button id="set-reset">回到已發布的顏色</button>
-        <h2>發布到公開網站</h2>
-        <p class="set-tip">改好之後按「匯出設定」，把下載的 style.js 蓋掉專案裡的 data/style.js，再上傳到 GitHub，公開網站就會換成這組顏色、時間與天氣。</p>
-        <button id="set-export">匯出設定</button>
-        <textarea id="set-out" rows="6" readonly hidden></textarea>
-        <a id="set-save" hidden>下載 style.js</a>
-      </div>
     </aside>
 
     <!-- Render 的成品：先給人看，再存檔 -->

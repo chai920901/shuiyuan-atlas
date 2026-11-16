@@ -71,7 +71,6 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
   background-size: 34px 120px; animation: rain .5s linear infinite; }
 #atlas[data-weather="rain"] #atlas-rain { opacity: .55; }
 @keyframes rain { to { background-position: -26px 120px; } }
-#atlas.ink #atlas-sky, #atlas.ink #atlas-rain { display: none; }
 #atlas.night #atlas-place, #atlas.night #atlas-name-en, #atlas.night #atlas-meta { color: #efe7d2; }
 
 /* 設定面板 */
@@ -81,27 +80,11 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
 #atlas-panel h2 { margin: 0 0 8px; font-size: 12px; font-weight: 900; letter-spacing: .16em; }
 #atlas-panel h2:not(:first-of-type) { margin-top: 16px; padding-top: 12px; border-top: 1.5px solid var(--ink); }
 #atlas-panel h2 b { float: right; margin-right: 26px; font: 500 11px/1.6 "DM Mono", monospace; letter-spacing: .06em; }
-#atlas-panel .admin-only h2 { margin-top: 16px; padding-top: 12px; border-top: 1.5px solid var(--ink); }
 #set-close { position: absolute; right: 6px; top: 6px; width: 26px; height: 26px; font-size: 13px; }
 #set-time { width: 100%; accent-color: var(--red); }
 #set-weather { display: flex; gap: 6px; margin-top: 8px; }
 #set-weather button { flex: 1; padding: 6px 0; font-size: 12px; font-weight: 700; border: 1.5px solid var(--ink); }
 #set-weather button.on { background: var(--ink); color: var(--paper); }
-#set-colors { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
-#set-colors label { display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 500; cursor: pointer; }
-#set-colors input { flex: none; width: 26px; height: 26px; padding: 0; border: 1.5px solid var(--ink); background: none; cursor: pointer; }
-#set-reset { margin-top: 14px; width: 100%; padding: 7px 0; font-size: 12px; font-weight: 700; letter-spacing: .1em; border: 1.5px solid var(--ink); }
-
-/* 只有後台看得到的東西 */
-.admin-only { display: none !important; }
-#atlas.admin .admin-only { display: revert !important; }
-#atlas.admin #atlas-render { display: block !important; }
-.set-tip { margin: 0 0 8px; font-size: 11px; line-height: 1.6; opacity: .8; }
-#set-export, #set-save { display: block; width: 100%; padding: 7px 0; font-size: 12px; font-weight: 700; letter-spacing: .1em; text-align: center;
-  border: 1.5px solid var(--ink); background: var(--red); color: #fff7ea; text-decoration: none; }
-#set-save[hidden], #set-out[hidden] { display: none; }
-#set-save { margin-top: 8px; background: var(--paper); color: var(--ink); }
-#set-out { width: 100%; margin-top: 8px; font: 400 10px/1.4 "DM Mono", monospace; border: 1.5px solid var(--ink); background: #fff; resize: vertical; }
 
 /* 分析模式：下方一排按鈕，上面一行說明 */
 #atlas-lens { display: flex; gap: 8px; padding: 6px max(16px, env(safe-area-inset-left)) 8px; overflow-x: auto; pointer-events: auto; scrollbar-width: none; }
@@ -112,9 +95,6 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
 #lens-note { margin: 0 max(16px, env(safe-area-inset-left)) 4px; max-width: 560px; padding: 8px 12px; font-size: 12px; line-height: 1.6;
   background: var(--paper); border: 1.5px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); }
 #lens-note[hidden] { display: none; }
-
-/* 線稿模式：底色換成白的，線才看得清楚 */
-#atlas.ink { background: #fbfaf6; }
 
 /* 按 Esc：只留下圖 */
 #atlas.bare #atlas-tags, #atlas.bare #atlas-head, #atlas.bare #atlas-tools, #atlas.bare #atlas-panel, #atlas.bare #atlas-foot { display: none; }
