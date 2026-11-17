@@ -656,7 +656,7 @@
     };
     stairs(len - 1.5, -1); stairs(6.5, -1); stairs(6.5, 1);                                          // 對街一座，市場門口往兩邊各一座
     spots.sky = { at, len, W, H, ang };
-    skyHolder = k.mesh();
+    skyHolder = lift(k.mesh());
     town.add(skyHolder);
   }
 
@@ -926,10 +926,10 @@
       const uc = cnt ? sum / cnt : 0, up = uc + 5.4, k = kit();
       // 中央的公車站：月台從天橋下面穿過，上面是深色的玻璃頂棚
       let q = at(up, 0);
-      k.tone('#ebe7dd'); k.box(q[0], q[1], ang, 36, 1.7, 0.45, 0.8);
-      k.tone('#4d5964'); k.box(q[0], q[1], ang, 32, 2, 3.5, 3.66);
-      k.tone('#dfe3e6'); for (let t = -30; t <= 30; t += 6) { q = at(up + 1.4, t); k.box(q[0], q[1], ang, 0.12, 0.12, 0.8, 3.5); }
-      q = at(up + 1.5, 0); k.tone('#b9d3df'); k.box(q[0], q[1], ang, 32, 0.05, 0.9, 2.7);
+      k.tone('#f6f3ea'); k.box(q[0], q[1], ang, 36, 1.7, 0.45, 0.8);
+      k.tone('#a9c6d6'); k.box(q[0], q[1], ang, 32, 2, 3.5, 3.66);                                  // 玻璃頂棚：淺藍灰
+      k.tone('#ffffff'); for (let t = -30; t <= 30; t += 6) { q = at(up + 1.4, t); k.box(q[0], q[1], ang, 0.12, 0.12, 0.8, 3.5); }
+      q = at(up + 1.5, 0); k.tone('#d6ebf3'); k.box(q[0], q[1], ang, 32, 0.05, 0.9, 2.7);
       spots.platform = at(up, 0);
       // 對街往東南約九十公尺：路邊的公車亭與畫在路面上的公車停靠區（現在沒有公車停靠）
       let d = 2; while (d < 40 && onRoad(at(d, 92)[0], at(d, 92)[1])) d += 0.5;
@@ -939,7 +939,7 @@
       q = at(d + 2.8, 92); shelter(k, q[0], q[1], ang, ux, uy); busStops.push(q);
       spots.layby = { c, ang, sx, sy, ux, uy, stop: q };
       spots.frame = { at, len, uc };
-      const grp = k.mesh(); scene.add(grp);
+      const grp = lift(k.mesh()); scene.add(grp);
     }
     paint(lane, C.busLane, 0.455);
     paint(white, '#fffdf6', 0.47);
@@ -1486,6 +1486,7 @@
       f.pts.geometry.attributes.position.needsUpdate = true;
     });
   }
+  const lift = (grp, e) => { grp.children[0].material.emissive = new T.Color(e || '#474747'); return grp; };   // 白模自己帶一點亮度，背光或晚上才不會灰灰暗暗的
   const tint3 = (mesh, opacity) => { mesh.children[0].material = new T.MeshBasicMaterial({ vertexColors: true, side: T.DoubleSide, transparent: opacity < 1, opacity }); mesh.children[0].castShadow = false; return mesh; };
   // 商圈類型：三塊範圍各蓋一層顏色
   function zones() {
@@ -1527,13 +1528,13 @@
     const hi = paint(road, mix(C.major, '#e8452c', 0.45), 0.76, { opacity: 0.95 }); if (hi) lensObj.issue.push(hi);
     const pink = C.heroPink, L = spots.layby, sk = spots.sky, N = spots.night, warn = '#e8452c', grey = '#8a8a8a';
     if (L) {                                                                    // 事件一：接送的車停在車道上，旁邊的停靠區空著
-      const strip = [], box = [], k = kit(), c0 = [L.c[0] - L.ux * 3.7, L.c[1] - L.uy * 3.7];
+      const strip = [], box = [], k = kit(), c0 = L.c;                    // 車子停在緊貼路緣的那一條車道上，就在停靠區前面
       ribbon(strip, [[c0[0] - L.sx * 66, c0[1] - L.sy * 66], [c0[0] - L.sx * 16, c0[1] - L.sy * 16]], 1.7, 0);
       eventObj[0].push(paint(strip, warn, 0.82, { opacity: 0.6 }));
       ribbon(box, [[-12, -1.7], [12, -1.7], [12, 1.7], [-12, 1.7], [-12, -1.7]].map(([t, o]) => [L.c[0] + L.sx * t + L.ux * o, L.c[1] + L.sy * t + L.uy * o]), 0.22, 0, [1.4, 1]);
       eventObj[0].push(paint(box, grey, 0.82, { opacity: 0.95 }));
-      [-60, -49, -38, -27].forEach((t) => { const x = c0[0] + L.sx * t, y = c0[1] + L.sy * t; k.tone('#f39a4a'); k.box(x, y, L.ang, 2.4, 1.05, 0.9, 1.75); k.tone('#ffd9b0'); k.box(x, y, L.ang, 1.3, 0.95, 1.75, 2.45); });
-      const g = k.mesh(); scene.add(g); eventObj[0].push(g);
+      [-60, -51, -42, -33, -24].forEach((t) => { const x = c0[0] + L.sx * t, y = c0[1] + L.sy * t; if (!onRoad(x, y)) return; k.tone('#f7a868'); k.box(x, y, L.ang, 2.4, 1.05, 0.9, 1.75); k.tone('#ffe6cc'); k.box(x, y, L.ang, 1.3, 0.95, 1.75, 2.45); });
+      const g = lift(k.mesh()); scene.add(g); eventObj[0].push(g);
       spots.jam = [c0[0] - L.sx * 44, c0[1] - L.sy * 44];
     }
     if (sk) {                                                                   // 事件二：上下天橋只有樓梯，橋下的空間零碎
@@ -1546,22 +1547,29 @@
     if (N) {                                                                    // 事件三：夜市的巷道裡攤位、行人、汽機車混在一起
       const m = new T.Mesh(up(new T.ShapeGeometry(shapes([[N.poly]]))), new T.MeshBasicMaterial({ color: warn, transparent: true, opacity: 0.5, depthWrite: false }));
       m.position.y = 0.82; m.renderOrder = 2; scene.add(m); eventObj[2].push(m);
-      const k = kit(), xs = N.poly.map((q) => q[0]), ys = N.poly.map((q) => q[1]);
-      for (let x = Math.min(...xs) + 4; x < Math.max(...xs); x += 12) for (let y = Math.min(...ys) + 4; y < Math.max(...ys); y += 12) {
-        const pt = { x: x + rnd() * 5, y: y + rnd() * 5 };
+      const k = kit(), xs = N.poly.map((q) => q[0]), ys = N.poly.map((q) => q[1]), put = [];
+      for (let x = Math.min(...xs) + 2; x < Math.max(...xs); x += 4) for (let y = Math.min(...ys) + 2; y < Math.max(...ys); y += 4) {
+        const pt = { x, y };
         if (!inside(pt, N.poly) || D.buildings.some((b) => inside(pt, b.p))) continue;
-        const a = rnd() < 0.5 ? 0.785 : -0.785;
-        if (rnd() < 0.4) { k.tone('#59626d'); k.box(pt.x, pt.y, a, 2.3, 1, 0.9, 1.7); k.tone('#7d8792'); k.box(pt.x, pt.y, a, 1.2, 0.9, 1.7, 2.35); }   // 汽車
-        else { k.tone('#3c434c'); k.box(pt.x, pt.y, a, 1, 0.35, 0.9, 1.6); }                                                                    // 機車
+        let best = 1e9, a = 0;                                                  // 離街邊最近的那一段：車頭順著它，而且只放在街的中間
+        for (let i = 0; i + 1 < N.poly.length; i++) {
+          const p0 = N.poly[i], p1 = N.poly[i + 1], dx = p1[0] - p0[0], dy = p1[1] - p0[1], t = Math.max(0, Math.min(1, ((x - p0[0]) * dx + (y - p0[1]) * dy) / (dx * dx + dy * dy || 1)));
+          const dist = Math.hypot(x - p0[0] - dx * t, y - p0[1] - dy * t);
+          if (dist < best) { best = dist; a = Math.atan2(dy, dx); }
+        }
+        if (best < 3.4 || put.some((q) => Math.hypot(q[0] - x, q[1] - y) < 9)) continue;
+        put.push([x, y]);
+        if (put.length % 3 === 0) { k.tone('#f7a868'); k.box(x, y, a, 2.3, 1, 0.9, 1.7); k.tone('#ffe6cc'); k.box(x, y, a, 1.2, 0.9, 1.7, 2.35); }      // 汽車
+        else { k.tone('#f08a4a'); k.box(x, y, a, 1, 0.35, 0.9, 1.6); k.tone('#ffd9b8'); k.box(x, y, a, 0.3, 0.3, 1.6, 2.3); }                             // 機車和騎士
       }
-      const g = k.mesh(); scene.add(g); eventObj[2].push(g);
+      const g = lift(k.mesh()); scene.add(g); eventObj[2].push(g);
     }
     if (L) {                                                                    // 一：閒置的公車停靠區改成家長臨時接送區
       const box = [], k = kit();
       ribbon(box, [[L.c[0] - L.sx * 12, L.c[1] - L.sy * 12], [L.c[0] + L.sx * 12, L.c[1] + L.sy * 12]], 1.7, 0);
       issueObj[0].push(paint(box, pink, 0.82, { opacity: 0.8 }));
-      [-7, 0, 7].forEach((t) => { const x = L.c[0] + L.sx * t, y = L.c[1] + L.sy * t; k.tone('#fcfbf7'); k.box(x, y, L.ang, 2.4, 1.05, 0.9, 1.75); k.tone('#dfe3e6'); k.box(x, y, L.ang, 1.3, 0.95, 1.75, 2.45); });
-      const g = k.mesh(); scene.add(g); issueObj[0].push(g);
+      [-7, 0, 7].forEach((t) => { const x = L.c[0] + L.sx * t, y = L.c[1] + L.sy * t; k.tone('#ffffff'); k.box(x, y, L.ang, 2.4, 1.05, 0.9, 1.75); k.tone('#eef3f6'); k.box(x, y, L.ang, 1.3, 0.95, 1.75, 2.45); });
+      const g = lift(k.mesh()); scene.add(g); issueObj[0].push(g);
     }
     if (sk) {                                                                   // 二：橋下空間改善、兩端加電梯
       const under = [], k = kit(), W = sk.W, H = sk.H;
