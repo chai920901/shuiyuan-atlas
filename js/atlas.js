@@ -55,7 +55,9 @@
     if (lawn >= 0) return 11 + lawn * 3;
     return 5 + Math.floor((t[0] + 2000) / 130) * 7 + Math.floor((t[1] + 2000) / 130) * 13;
   };
-  const treeKind = (t) => (t[3] >= 100 ? t[3] - 100 : treeSet[treeZone(t) % treeSet.length]);   // 這棵樹是圖鑑裡的哪一種（手動指定的優先）
+  let treeMix = STYLE.treeMix === 'zone' ? 'zone' : 'random';                    // 樹種怎麼分布：random 每棵隨機散落、zone 一片一種
+  if (EDIT) { try { const v = localStorage.getItem(STORE + '-treemix'); if (v) treeMix = v; } catch (e) { /* 用檔案裡的 */ } }
+  const treeKind = (t) => (t[3] >= 100 ? t[3] - 100 : treeSet[(treeMix === 'zone' ? treeZone(t) : Math.abs(Math.round(t[0] * 7.3 + t[1] * 13.7)) + t[3]) % treeSet.length]);   // 這棵樹是圖鑑裡的哪一種（手動指定的優先）
   let treeTool = '', treeShown = { flat: [], hill: [] };                        // treeTool：'' 沒在用、'add' 種樹、'cut' 移除
   function treeList() {
     const gone = (t) => TREES.cut.some((c) => Math.abs(c[0] - t[0]) < 0.6 && Math.abs(c[1] - t[1]) < 0.6);
@@ -1357,14 +1359,14 @@
     if (!EDIT) return;                                                         // 發布出去的網站到這裡為止，沒有調色與輸出的介面
     panel.insertAdjacentHTML('beforeend', '<div id="set-edit"><h2>輸出</h2><button id="atlas-render" title="把現在的角度存成 PNG；按住 Shift 再按，背景透明">Render 存成 PNG</button>' +
       '<p class="set-tip">存的是現在畫面的角度。按住 Shift 再按，背景是透明的。</p><h2>畫面</h2><button id="set-wc"></button><button id="set-people"></button><h2>樹</h2><div id="set-tree" class="set-pick"><button data-tool="add">種樹</button><button data-tool="cut">移除樹</button></div>' +
-      '<p class="set-tip" id="set-tree-tip"></p><div id="set-tree-lib"></div><p class="set-tip">樹的圖鑑：亮著的是地圖上會出現的種類，點一下開或關。按了「種樹」之後再點其中一種，就只種那一種（再點一次回到隨機）。</p><button id="set-tree-copy">複製 trees.js 的內容</button><textarea id="set-tree-out" rows="3" readonly></textarea><button id="set-tree-reset">回到檔案裡的樹</button><h2>山的圖案</h2><div id="set-hill" class="set-pick"></div><h2>顏色</h2><div id="set-colors"></div><button id="set-reset">回到檔案裡的顏色</button>' +
+      '<p class="set-tip" id="set-tree-tip"></p><button id="set-tree-mix"></button><div id="set-tree-lib"></div><p class="set-tip">樹的圖鑑：亮著的是地圖上會出現的種類，點一下開或關。按了「種樹」之後再點其中一種，就只種那一種（再點一次回到隨機）。</p><button id="set-tree-copy">複製 trees.js 的內容</button><textarea id="set-tree-out" rows="3" readonly></textarea><button id="set-tree-reset">回到檔案裡的樹</button><h2>山的圖案</h2><div id="set-hill" class="set-pick"></div><h2>顏色</h2><div id="set-colors"></div><button id="set-reset">回到檔案裡的顏色</button>' +
       '<p class="set-tip">這一區只有在自己電腦上預覽時才會出現。調好之後跟 Claude 說「存顏色」，或按下面的按鈕複製，貼到 data/style.js 蓋掉原本的內容再上傳。</p>' +
       '<button id="set-copy">複製 style.js 的內容</button><textarea id="set-out" rows="5" readonly></textarea></div>');
     const list = document.getElementById('set-colors'), out = document.getElementById('set-out');
     document.getElementById('atlas-render').addEventListener('click', (e) => shot(e.shiftKey));
     const text = () => {
       const lines = PALETTE.concat([['slab', '底座側邊'], ['pier', '橋墩']]).map(([k, label]) => "    " + k + ": '" + C[k] + "',".padEnd(22) + '// ' + label);
-      return '// 網站的顏色與天氣。由頁面上的調色面板產生。時間不用設定，網站會跟著看的人當下的時刻走。\nwindow.ATLAS_STYLE = {\n  palette: {\n' + lines.join('\n') + '\n  },\n  people: \'' + peopleStyle + '\',\n  trees: [' + treeSet.join(', ') + '],\n  watercolor: ' + wc + ',\n  hillPattern: \'' + hillKind + '\',\n  weather: \'' + sky.weather + '\',\n};\n';
+      return '// 網站的顏色與天氣。由頁面上的調色面板產生。時間不用設定，網站會跟著看的人當下的時刻走。\nwindow.ATLAS_STYLE = {\n  palette: {\n' + lines.join('\n') + '\n  },\n  treeMix: \'' + treeMix + '\',\n  people: \'' + peopleStyle + '\',\n  trees: [' + treeSet.join(', ') + '],\n  watercolor: ' + wc + ',\n  hillPattern: \'' + hillKind + '\',\n  weather: \'' + sky.weather + '\',\n};\n';
     };
     let wait = null;
     const inputs = {}, store = () => {
@@ -1415,6 +1417,9 @@
       lib.appendChild(b);
     });
     libShow();
+    const mixBtn = document.getElementById('set-tree-mix'), mixShow = () => { mixBtn.textContent = '樹種分布：' + (treeMix === 'zone' ? '一片一種' : '隨機散落'); };
+    mixBtn.addEventListener('click', () => { treeMix = treeMix === 'zone' ? 'random' : 'zone'; try { localStorage.setItem(STORE + '-treemix', treeMix); } catch (e) { /* 只留在這一次 */ } mixShow(); out.value = text(); build(); });
+    mixShow();
     treeSaved();
     const hillBox = document.getElementById('set-hill');
     HILLS.forEach(([k, label]) => {

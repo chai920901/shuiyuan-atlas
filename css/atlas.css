@@ -208,7 +208,7 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
 #issue-side { display: flex; gap: 6px; }
 #issue-side button { flex: 1; padding: 7px 0; font-size: 13px; font-weight: 900; letter-spacing: .2em; border: 1.5px solid var(--ink); border-radius: 999px; }
 #issue-side button.on { background: var(--ink); color: var(--paper); }
-#set-tree-copy, #set-tree-reset { margin-top: 8px; width: 100%; padding: 7px 0; font-size: 12px; font-weight: 700; letter-spacing: .1em; border: 1.5px solid var(--ink); }
+#set-tree-mix, #set-tree-copy, #set-tree-reset { margin-top: 8px; width: 100%; padding: 7px 0; font-size: 12px; font-weight: 700; letter-spacing: .1em; border: 1.5px solid var(--ink); }
 #set-tree-out { width: 100%; margin-top: 6px; font: 10px/1.4 monospace; }
 #issue-card p b { flex: none; align-self: flex-start; padding: 0 6px; font-size: 11px; background: var(--ink); color: var(--paper); letter-spacing: .08em; }
 #atlas.survey #issue-card { display: none; }

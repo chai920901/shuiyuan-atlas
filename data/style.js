@@ -39,6 +39,7 @@ window.ATLAS_STYLE = {
     heroSky: '#2f8fe6',    // 淺藍：樓身、天橋欄杆
     heroPink: '#ec3cb4',   // 杜鵑：格子、色塊、人流與步行圈
   },
+  treeMix: 'random',       // 樹種怎麼分布：random 每棵隨機散落、zone 一片一種（同一座山、同一條路的行道樹同一種）
   people: 'crayon',        // 人物的畫法：crayon 蠟筆插畫、water 水彩剪影
   trees: [12, 13, 14, 15, 16, 17],   // 地圖上用圖鑑裡的哪幾種樹。0–11 是水彩樹（水滴、同心圓、葉片、橫紋、圓葉、針葉、層疊、松、藍水滴、枯枝、秋色、淡黃），12–17 是最早的六色點描水滴
   hillPattern: 'loops',     // 山的圖案：wave 波紋、paver 斜格、loops 草圈、stripes 橫條
