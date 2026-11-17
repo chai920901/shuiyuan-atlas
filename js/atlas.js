@@ -10,10 +10,10 @@
     wood: '#3f6c49', lawn: '#d3dfae', lawnLine: '#4f8e58',
     major: '#c4776b', minor: '#d79c8f', lane: '#e6c4b5', foot: '#f9f3e6',
     wall: '#f3e8cb', deck: '#b9655a', pier: '#d8ccb2', key: '#d93a1e', key2: '#e9b44c',
-    heroBlue: '#1a44c8', heroSky: '#2f8fe6', heroPink: '#d81b72', tint: '#d81b72',
+    heroBlue: '#1a44c8', heroSky: '#2f8fe6', heroPink: '#d81b72', tint: '#d81b72', busLane: '#38c6b8',
   };
   const PALETTE = [['paper', '紙底'], ['ink', '墨線'], ['sea', '水面'], ['wave', '水紋'], ['hill', '山　底色'], ['wood', '山　圖案線條'], ['lawn', '草地'], ['lawnLine', '草地條紋'],
-    ['major', '大馬路'], ['minor', '街道'], ['lane', '巷道'], ['foot', '步道'], ['wall', '建築'], ['tint', '市場周邊的房子'], ['deck', '高架橋'], ['key2', '地標／天橋'],
+    ['major', '大馬路'], ['minor', '街道'], ['lane', '巷道'], ['foot', '步道'], ['wall', '建築'], ['tint', '市場周邊的房子'], ['deck', '高架橋'], ['busLane', '公車專用道'], ['key2', '地標／天橋'],
     ['heroBlue', '市場　深藍'], ['heroSky', '市場　淺藍'], ['heroPink', '市場　杜鵑']];
   const STORE = 'atlas-palette-' + S.id;
   // data/style.js 裡可以覆蓋預設的顏色、時間、天氣
@@ -31,6 +31,19 @@
   let hillKind = STYLE.hillPattern || 'wave';
   if (EDIT) { try { hillKind = localStorage.getItem(STORE + '-hill') || hillKind; } catch (e) { /* 用檔案裡的 */ } }
   if (!HILLS.some((h) => h[0] === hillKind)) hillKind = 'wave';
+  // 樹：地圖資料自動種的，加上手動加的（add），扣掉手動移掉的（cut）。發布的版本讀 data/trees.js；自己電腦上編輯時先存在瀏覽器裡
+  const TREES = { add: ((window.ATLAS_TREES || {}).add || []).slice(), cut: ((window.ATLAS_TREES || {}).cut || []).slice() };
+  if (EDIT) { try { const v = JSON.parse(localStorage.getItem(STORE + '-trees') || 'null'); if (v) { TREES.add = v.add || []; TREES.cut = v.cut || []; } } catch (e) { /* 用檔案裡的 */ } }
+  let treeTool = '', treeShown = { flat: [], hill: [] };                        // treeTool：'' 沒在用、'add' 種樹、'cut' 移除
+  function treeList() {
+    const gone = (t) => TREES.cut.some((c) => Math.abs(c[0] - t[0]) < 0.6 && Math.abs(c[1] - t[1]) < 0.6);
+    const flat = D.trees.filter((t) => !t[4] && !gone(t)), hill = D.trees.filter((t, i) => t[5] > 0 && i % 5 === 0 && !gone(t));
+    TREES.add.forEach((t, n) => {
+      const lv = (D.hills || []).reduce((c, level) => c + (inAny({ x: t[0], y: t[1] }, level) ? 1 : 0), 0);   // 種在山上的要站到那一階上
+      (lv ? hill : flat).push([t[0], t[1], t[2], t[3], lv ? 1 : 0, lv, n + 1]);                           // 最後一格：這是手動加的第幾棵
+    });
+    return (treeShown = { flat, hill });
+  }
   let wc = STYLE.watercolor !== false;                                           // 水彩濾鏡：畫面邊緣微微暈開，疊一層紙的斑駁
   if (EDIT) { try { const v = localStorage.getItem(STORE + '-wc'); if (v) wc = v === '1'; } catch (e) { /* 用檔案裡的 */ } }
   function derive() {                                                           // 由主色推出深淺變化
@@ -205,11 +218,11 @@
   }
 
   // ---------- 模式用的登記簿 ----------
-  const fills = [], inks = [], solidOnly = [], heightOnly = [], roofOnly = [], crowd = [], colorOnly = [], paleOnly = [], hillOnly = [], issueObj = [[], [], []];
+  const fills = [], inks = [], solidOnly = [], heightOnly = [], roofOnly = [], crowd = [], colorOnly = [], paleOnly = [], hillOnly = [], issueObj = [[], [], []], eventObj = [[], [], []];
   const lensObj = { walk: [], car: [], shop: [], art: [], issue: [], height: [], reach: [] };
   const fill = (m) => { m.polygonOffset = true; m.polygonOffsetFactor = 1; m.polygonOffsetUnits = 1; fills.push(m); return m; };   // 有顏色的面
   const ink = (opacity) => { const m = new T.LineBasicMaterial({ color: C.ink, transparent: true, opacity }); m.userData.base = opacity; inks.push(m); return m; };
-  let mode = 'a', lens = 'map', bare = false, issueAt = 0;                                  // lens：分析模式
+  let mode = 'a', lens = 'map', bare = false, issueAt = 0, issueSide = 'find';                                   // 議題：find 是事件（現況），fix 是方法（改善）                                  // lens：分析模式
   const blobs = [];
 
   // ---------- 地面的各層 ----------
@@ -870,13 +883,21 @@
     k.tone('#e9523a'); k.box(x - cx * 4.7 + nx * 0.9, y - cy * 4.7 + ny * 0.9, a, 0.9, 0.1, 0.9, 2.9);
   }
   function streets() {
-    const white = [], lane = [], zebra = [], LW = 3.3;
+    const white = [], lane = [], zebra = [], LW = 3.3, busText = [];
     (X.roads || []).forEach((r) => {
       const w = (r.n * LW) / 2;
       [-w, w].forEach((o) => ribbon(white, r.p, 0.16, o));
       for (let i = 1; i < r.n; i++) ribbon(white, r.p, 0.14, -w + i * LW, [4, 6]);
     });
-    (X.bus || []).forEach((p) => { ribbon(lane, p, 1.75, 0); [-1.75, 1.75].forEach((o) => ribbon(white, p, 0.16, o)); });
+    (X.bus || []).forEach((p) => {                                            // 公車專用道：整條換一個顏色、兩邊粗白線，每隔一段寫上字
+      ribbon(lane, p, 1.95, 0); [-1.95, 1.95].forEach((o) => ribbon(white, p, 0.3, o));
+      let run = 55;
+      for (let i = 0; i + 1 < p.length; i++) {
+        const a = p[i], b = p[i + 1], len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        for (; run < len; run += 120) { const x = a[0] + ((b[0] - a[0]) * run) / len, y = a[1] + ((b[1] - a[1]) * run) / len; if (inBox([x, y], 30) && !busText.some((q) => Math.hypot(q[0] - x, q[1] - y) < 60)) { busText.push([x, y]); words.push(sign('公車專用道', x, y, Math.atan2(b[1] - a[1], b[0] - a[0]), 3)); } }
+        run -= len;
+      }
+    });
     const bars = (line, half) => {                                              // 斑馬線：一條一條跟車行方向平行的白線
       for (let i = 0; i + 1 < line.length; i++) {
         const a = line[i], b = line[i + 1], len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, ux = (b[0] - a[0]) / len, uy = (b[1] - a[1]) / len;
@@ -910,7 +931,6 @@
       k.tone('#dfe3e6'); for (let t = -30; t <= 30; t += 6) { q = at(up + 1.4, t); k.box(q[0], q[1], ang, 0.12, 0.12, 0.8, 3.5); }
       q = at(up + 1.5, 0); k.tone('#b9d3df'); k.box(q[0], q[1], ang, 32, 0.05, 0.9, 2.7);
       spots.platform = at(up, 0);
-      words.push(sign('公車專用道', at(uc, 52)[0], at(uc, 52)[1], ang, 3));
       // 對街往東南約九十公尺：路邊的公車亭與畫在路面上的公車停靠區（現在沒有公車停靠）
       let d = 2; while (d < 40 && onRoad(at(d, 92)[0], at(d, 92)[1])) d += 0.5;
       const c = at(d - 2, 92), box = [[-12, -1.7], [12, -1.7], [12, 1.7], [-12, 1.7], [-12, -1.7]].map(([t, o]) => [c[0] + sx * t + ux * o, c[1] + sy * t + uy * o]);
@@ -921,7 +941,7 @@
       spots.frame = { at, len, uc };
       const grp = k.mesh(); scene.add(grp);
     }
-    paint(lane, mix(C.major, '#6e2a22', 0.3), 0.455);
+    paint(lane, C.busLane, 0.455);
     paint(white, '#fffdf6', 0.47);
     paint(zebra, '#fffdf6', 0.48);
   }
@@ -1024,13 +1044,13 @@
       tags.appendChild(el);
       pins.push({ el, stem: el.firstChild, at: s.at, lift: (s.h || 0) + 40 });
     });
-    const pin = (zh, en, x, y, lift, lens, issue, color) => {                    // 只在某個分析模式（或某一則議題）才出現的標籤
+    const pin = (zh, en, x, y, lift, lens, issue, color, side) => {                    // 只在某個分析模式（或某一則議題）才出現的標籤
       const el = document.createElement('div');
       el.className = 'note note-lens'; el.innerHTML = '<i></i><span><b></b></span>';
       el.querySelector('b').textContent = zh; el.querySelector('span').appendChild(document.createTextNode(en || ''));
       if (color) el.style.setProperty('--tone', color);
       el.style.display = 'none'; tags.appendChild(el);
-      pins.push({ el, stem: el.firstChild, at: { x, y }, lift, lens, issue });
+      pins.push({ el, stem: el.firstChild, at: { x, y }, lift, lens, issue, side });
     };
     const hero = S.notes.find((n) => n.mark === 'main');
     (S.zones || []).forEach((z) => {
@@ -1042,12 +1062,22 @@
       (S.arts.links || []).forEach(([i, j, fest]) => { if (!fest) return; const a = toXY(S.arts.nodes[i]), b = toXY(S.arts.nodes[j]); pin(fest, '', (a.x + b.x) / 2, (a.y + b.y) / 2, 95, 'art', null, C.key2); });
     }
     const L = spots.layby, sk = spots.sky, N = spots.night;
-    if (L) { pin('家長臨時接送區', '原本閒置的公車停靠區', L.c[0], L.c[1], 22, 'issue', 0, C.heroPink); pin('公車亭', '水源市場站', L.stop[0], L.stop[1], 14, 'issue', 0); }
-    if (sk) {
-      let q = sk.at(sk.len - 1.5, sk.W + 1.5); pin('天橋電梯（新增）', '無障礙上下天橋', q[0], q[1], 24, 'issue', 1, C.heroPink);
-      q = sk.at(5, -9); pin('橋下空間改善', '一樓橋下與樓梯下方', q[0], q[1], 12, 'issue', 1, C.heroPink);
+    const warn = '#e8452c';
+    if (L) {
+      pin('家長臨時接送區', '閒置的公車停靠區改用', L.c[0], L.c[1], 22, 'issue', 0, C.heroPink, 'fix'); pin('公車亭', '水源市場站', L.stop[0], L.stop[1], 14, 'issue', 0);
+      pin('閒置的公車停靠區', '現在沒有公車停靠', L.c[0], L.c[1], 22, 'issue', 0, '#8a8a8a', 'find');
+      if (spots.jam) pin('臨時接送佔用車道', '上下學時間', spots.jam[0], spots.jam[1], 16, 'issue', 0, warn, 'find');
     }
-    if (N) pin('夜間行人徒步區', '晚上 6:00–9:00 車輛不進入', N.c[0], N.c[1], 40, 'issue', 2, C.heroPink);
+    if (sk) {
+      let q = sk.at(sk.len - 1.5, sk.W + 1.5); pin('天橋電梯（新增）', '無障礙上下天橋', q[0], q[1], 24, 'issue', 1, C.heroPink, 'fix');
+      q = sk.at(5, -9); pin('橋下空間改善', '一樓橋下與樓梯下方', q[0], q[1], 12, 'issue', 1, C.heroPink, 'fix');
+      q = sk.at(6.5, sk.W + 9); pin('只有樓梯', '推車、輪椅、提重物都不方便', q[0], q[1], 18, 'issue', 1, warn, 'find');
+      q = sk.at(5, -9); pin('橋下空間零碎', '一樓橋下與樓梯下方', q[0], q[1], 12, 'issue', 1, '#8a8a8a', 'find');
+    }
+    if (N) {
+      pin('夜間行人徒步區', '晚上 6:00–9:00 車輛不進入', N.c[0], N.c[1], 40, 'issue', 2, C.heroPink, 'fix');
+      pin('人車混雜', '攤位、行人與汽機車擠在同一條路', N.c[0], N.c[1], 40, 'issue', 2, warn, 'find');
+    }
   }
   const v = new T.Vector3();
   function place() {
@@ -1079,6 +1109,7 @@
       b.textContent = '議題 ' + (i + 1); b.addEventListener('click', () => setIssue(i));
       tabs.appendChild(b);
     });
+    [...document.getElementById('issue-side').children].forEach((b) => b.addEventListener('click', () => { issueSide = b.dataset.side; setMode('a', 'issue'); }));
     if (!(S.issues || []).length) bar.querySelector('[data-lens="issue"]').hidden = true;
     document.getElementById('atlas-top').addEventListener('click', () => fly({ el: view.el > 1.2 ? (survey ? 0.6155 : HOME.el) : 1.5 }));
     document.getElementById('atlas-name').textContent = S.name.zh;
@@ -1175,7 +1206,8 @@
     // 調色
     if (!EDIT) return;                                                         // 發布出去的網站到這裡為止，沒有調色與輸出的介面
     panel.insertAdjacentHTML('beforeend', '<div id="set-edit"><h2>輸出</h2><button id="atlas-render" title="把現在的角度存成 PNG；按住 Shift 再按，背景透明">Render 存成 PNG</button>' +
-      '<p class="set-tip">存的是現在畫面的角度。按住 Shift 再按，背景是透明的。</p><h2>畫面</h2><button id="set-wc"></button><h2>山的圖案</h2><div id="set-hill" class="set-pick"></div><h2>顏色</h2><div id="set-colors"></div><button id="set-reset">回到檔案裡的顏色</button>' +
+      '<p class="set-tip">存的是現在畫面的角度。按住 Shift 再按，背景是透明的。</p><h2>畫面</h2><button id="set-wc"></button><h2>樹</h2><div id="set-tree" class="set-pick"><button data-tool="add">種樹</button><button data-tool="cut">移除樹</button></div>' +
+      '<p class="set-tip" id="set-tree-tip"></p><button id="set-tree-copy">複製 trees.js 的內容</button><textarea id="set-tree-out" rows="3" readonly></textarea><button id="set-tree-reset">回到檔案裡的樹</button><h2>山的圖案</h2><div id="set-hill" class="set-pick"></div><h2>顏色</h2><div id="set-colors"></div><button id="set-reset">回到檔案裡的顏色</button>' +
       '<p class="set-tip">這一區只有在自己電腦上預覽時才會出現。調好之後跟 Claude 說「存顏色」，或按下面的按鈕複製，貼到 data/style.js 蓋掉原本的內容再上傳。</p>' +
       '<button id="set-copy">複製 style.js 的內容</button><textarea id="set-out" rows="5" readonly></textarea></div>');
     const list = document.getElementById('set-colors'), out = document.getElementById('set-out');
@@ -1200,6 +1232,23 @@
     const wcBtn = document.getElementById('set-wc'), wcShow = () => { wcBtn.textContent = '水彩濾鏡：' + (wc ? '開' : '關'); stage.classList.toggle('wc', wc); };
     wcBtn.addEventListener('click', () => { wc = !wc; try { localStorage.setItem(STORE + '-wc', wc ? '1' : '0'); } catch (e) { /* 只留在這一次 */ } wcShow(); out.value = text(); });
     wcShow();
+    const treeOut = document.getElementById('set-tree-out'), treeTip = document.getElementById('set-tree-tip'), treeBtns = [...document.getElementById('set-tree').children];
+    treeSaved = () => {
+      treeOut.value = '// 手動加的樹（add：x, y, 大小, 顏色 0–5）和移掉的樹（cut：x, y）。由頁面上的種樹工具產生。\nwindow.ATLAS_TREES = ' + JSON.stringify(TREES) + ';\n';
+      treeTip.textContent = (treeTool === 'add' ? '種樹中：在地圖上點一下種一棵（拖曳還是可以轉動畫面）。' : treeTool === 'cut' ? '移除中：點一棵樹把它移掉。' : '按「種樹」或「移除樹」後到地圖上點。再按一次同一顆按鈕結束。') + '　目前加了 ' + TREES.add.length + ' 棵、移掉 ' + TREES.cut.length + ' 棵。';
+    };
+    treeBtns.forEach((b) => b.addEventListener('click', () => {
+      treeTool = treeTool === b.dataset.tool ? '' : b.dataset.tool;
+      treeBtns.forEach((c) => c.classList.toggle('on', c.dataset.tool === treeTool));
+      canvas.style.cursor = treeTool ? 'crosshair' : ''; treeSaved();
+    }));
+    document.getElementById('set-tree-copy').addEventListener('click', () => { treeOut.select(); if (navigator.clipboard) navigator.clipboard.writeText(treeOut.value).catch(() => {}); });
+    document.getElementById('set-tree-reset').addEventListener('click', () => {
+      const f = window.ATLAS_TREES || {}; TREES.add = (f.add || []).slice(); TREES.cut = (f.cut || []).slice();
+      try { localStorage.removeItem(STORE + '-trees'); } catch (e) { /* 沒關係 */ }
+      treeSaved(); build();
+    });
+    treeSaved();
     const hillBox = document.getElementById('set-hill');
     HILLS.forEach(([k, label]) => {
       const b = document.createElement('button');
@@ -1231,14 +1280,15 @@
       });
     });
     slices.length = 0;
-    [fills, inks, solidOnly, heightOnly, roofOnly, crowd, colorOnly, paleOnly, hillOnly, issueObj[0], issueObj[1], issueObj[2], lensObj.shop, lensObj.art, lensObj.issue, growers, words, blobs, lensObj.walk, lensObj.car, lensObj.height, lensObj.reach].forEach((a) => { a.length = 0; });
+    [fills, inks, solidOnly, heightOnly, roofOnly, crowd, colorOnly, paleOnly, hillOnly, issueObj[0], issueObj[1], issueObj[2], eventObj[0], eventObj[1], eventObj[2], lensObj.shop, lensObj.art, lensObj.issue, growers, words, blobs, lensObj.walk, lensObj.car, lensObj.height, lensObj.reach].forEach((a) => { a.length = 0; });
     flock.length = 0;
     derive(); seed = 11;
     heroSpan = null;
     ground(); buildings(); bridges(); skywalk(); streets(); nightMarket(); hills();
     const leaf = texTrees();
-    colorOnly.push(standees(D.trees.filter((t) => !t[4]), 9, 14.5, 3, 2, leaf, 3.4));
-    colorOnly.push(standees(D.trees.filter((t, i) => t[5] > 0 && i % 5 === 0), 9, 14.5, 3, 2, leaf, 3.4, (t) => 0.2 + t[5] * RISE));   // 山上只留一些樹
+    const tr = treeList();
+    colorOnly.push(standees(tr.flat, 9, 14.5, 3, 2, leaf, 3.4));
+    colorOnly.push(standees(tr.hill, 9, 14.5, 3, 2, leaf, 3.4, (t) => 0.2 + t[5] * RISE));   // 山上只留一些樹
     crowd.push(standees(D.people.map((t, i) => [t[0], t[1], t[2], (i * 5 + t[3]) % 24]), 3.45, 4.6, 8, 3, texPeople(), 0.9));
     traffic();
     roadNames(); lenses(); surveyBase();
@@ -1353,9 +1403,10 @@
     hillOnly.concat(colorOnly).forEach((o) => { if (o) o.visible = !issue; });   // 議題：山、樹也收起來，只留羅斯福路和主體有顏色
     crowd.forEach((o) => { o.visible = lens !== 'walk' && lens !== 'car'; });   // 人流、車流時把裝飾的小人收起來，免得跟流動的點混在一起
     Object.keys(lensObj).forEach((k) => lensObj[k].forEach((o) => { o.visible = lens === k; }));
-    issueObj.forEach((list, i) => list.forEach((o) => { o.visible = issue && i === issueAt; }));
+    issueObj.forEach((list, i) => list.forEach((o) => { o.visible = issue && i === issueAt && issueSide === 'fix'; }));
+    eventObj.forEach((list, i) => list.forEach((o) => { o.visible = issue && i === issueAt && issueSide === 'find'; }));
     forceStalls = issue && issueAt === 2;                                     // 夜市那一則：不管幾點都把攤位擺出來
-    pins.forEach((p) => { if (p.lens) p.el.style.display = p.lens === lens && (p.issue == null || p.issue === issueAt) ? '' : 'none'; });
+    pins.forEach((p) => { if (p.lens) p.el.style.display = p.lens === lens && (p.issue == null || p.issue === issueAt) && (!p.side || p.side === issueSide) ? '' : 'none'; });
     words.forEach((o) => { o.visible = !bare; });
     [...document.getElementById('atlas-lens').children].forEach((b) => b.classList.toggle('on', b.dataset.lens === lens));
     const note = document.getElementById('lens-note');
@@ -1364,8 +1415,8 @@
     card.hidden = !issue || !it;
     if (it) {
       document.getElementById('issue-title').textContent = it.title;
-      document.getElementById('issue-find').textContent = it.find;
-      document.getElementById('issue-fix').textContent = it.fix;
+      document.getElementById('issue-text').textContent = it[issueSide];
+      [...document.getElementById('issue-side').children].forEach((b) => b.classList.toggle('on', b.dataset.side === issueSide));
       [...document.getElementById('issue-tabs').children].forEach((b, i) => b.classList.toggle('on', i === issueAt));
     }
     applySky();
@@ -1375,7 +1426,7 @@
     return c ? { x: c[0], y: c[1], size: i === 2 ? 110 : 62, az: i === 1 ? 2.2 : HOME.az } : null;   // 天橋要從對街那一側看，才不會被主體擋住
   }
   function setIssue(i) {
-    issueAt = i; setMode('a', 'issue');
+    issueAt = i; issueSide = 'find'; setMode('a', 'issue');                    // 換一則議題：先看事件
     const t = issueSpot(i);
     if (t) { view.az = ((view.az - t.az + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI + t.az; fly({ tx: t.x, tz: -t.y, ty: 0, size: t.size, az: t.az, el: 0.7 }); }
   }
@@ -1466,7 +1517,37 @@
     (X.roads || []).forEach((r) => ribbon(road, r.p, r.n * 1.72, 0));
     (X.bus || []).forEach((l) => ribbon(road, l, 1.9, 0));
     const hi = paint(road, mix(C.major, '#e8452c', 0.45), 0.76, { opacity: 0.95 }); if (hi) lensObj.issue.push(hi);
-    const pink = C.heroPink, L = spots.layby, sk = spots.sky, N = spots.night;
+    const pink = C.heroPink, L = spots.layby, sk = spots.sky, N = spots.night, warn = '#e8452c', grey = '#8a8a8a';
+    if (L) {                                                                    // 事件一：接送的車停在車道上，旁邊的停靠區空著
+      const strip = [], box = [], k = kit(), c0 = [L.c[0] - L.ux * 3.7, L.c[1] - L.uy * 3.7];
+      ribbon(strip, [[c0[0] - L.sx * 66, c0[1] - L.sy * 66], [c0[0] - L.sx * 16, c0[1] - L.sy * 16]], 1.7, 0);
+      eventObj[0].push(paint(strip, warn, 0.82, { opacity: 0.6 }));
+      ribbon(box, [[-12, -1.7], [12, -1.7], [12, 1.7], [-12, 1.7], [-12, -1.7]].map(([t, o]) => [L.c[0] + L.sx * t + L.ux * o, L.c[1] + L.sy * t + L.uy * o]), 0.22, 0, [1.4, 1]);
+      eventObj[0].push(paint(box, grey, 0.82, { opacity: 0.95 }));
+      [-60, -49, -38, -27].forEach((t) => { const x = c0[0] + L.sx * t, y = c0[1] + L.sy * t; k.tone('#f39a4a'); k.box(x, y, L.ang, 2.4, 1.05, 0.9, 1.75); k.tone('#ffd9b0'); k.box(x, y, L.ang, 1.3, 0.95, 1.75, 2.45); });
+      const g = k.mesh(); scene.add(g); eventObj[0].push(g);
+      spots.jam = [c0[0] - L.sx * 44, c0[1] - L.sy * 44];
+    }
+    if (sk) {                                                                   // 事件二：上下天橋只有樓梯，橋下的空間零碎
+      const st = [], under = [], W = sk.W;
+      [[6.5, 1], [6.5, -1], [sk.len - 1.5, -1]].forEach(([s0, d]) => ribbon(st, [sk.at(s0, d * (W + 1)), sk.at(s0, d * (W + 15.5))], 1.6, 0));
+      eventObj[1].push(paint(st, warn, 0.84, { opacity: 0.75 }));
+      [[-1, 12, 15], [sk.len - 7, sk.len + 2, 15]].forEach(([s0, s1, o]) => ribbon(under, [sk.at(s0, 0), sk.at(s1, 0)], o, 0));
+      eventObj[1].push(paint(under, grey, 0.82, { opacity: 0.4 }));
+    }
+    if (N) {                                                                    // 事件三：夜市的巷道裡攤位、行人、汽機車混在一起
+      const m = new T.Mesh(up(new T.ShapeGeometry(shapes([[N.poly]]))), new T.MeshBasicMaterial({ color: warn, transparent: true, opacity: 0.5, depthWrite: false }));
+      m.position.y = 0.82; m.renderOrder = 2; scene.add(m); eventObj[2].push(m);
+      const k = kit(), xs = N.poly.map((q) => q[0]), ys = N.poly.map((q) => q[1]);
+      for (let x = Math.min(...xs) + 4; x < Math.max(...xs); x += 12) for (let y = Math.min(...ys) + 4; y < Math.max(...ys); y += 12) {
+        const pt = { x: x + rnd() * 5, y: y + rnd() * 5 };
+        if (!inside(pt, N.poly) || D.buildings.some((b) => inside(pt, b.p))) continue;
+        const a = rnd() < 0.5 ? 0.785 : -0.785;
+        if (rnd() < 0.4) { k.tone('#59626d'); k.box(pt.x, pt.y, a, 2.3, 1, 0.9, 1.7); k.tone('#7d8792'); k.box(pt.x, pt.y, a, 1.2, 0.9, 1.7, 2.35); }   // 汽車
+        else { k.tone('#3c434c'); k.box(pt.x, pt.y, a, 1, 0.35, 0.9, 1.6); }                                                                    // 機車
+      }
+      const g = k.mesh(); scene.add(g); eventObj[2].push(g);
+    }
     if (L) {                                                                    // 一：閒置的公車停靠區改成家長臨時接送區
       const box = [], k = kit();
       ribbon(box, [[L.c[0] - L.sx * 12, L.c[1] - L.sy * 12], [L.c[0] + L.sx * 12, L.c[1] + L.sy * 12]], 1.7, 0);
@@ -1668,6 +1749,7 @@
       const r = canvas.getBoundingClientRect();
       tap.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
       ray.setFromCamera(tap, camera);
+      if (treeTool) { treeTap(ray, e.clientX - r.left, e.clientY - r.top, r); return; }
       if (ray.intersectObjects(slices.map((sl) => sl.g.children[0])).length) setSurvey(true);
     });
     canvas.addEventListener('pointercancel', end);
@@ -1682,6 +1764,29 @@
     });
     window.addEventListener('keyup', (e) => { keys.delete(e.key.toLowerCase()); });
     window.addEventListener('blur', () => keys.clear());
+  }
+
+  // ---------- 種樹工具（只有自己電腦上的編輯模式有）：點一下種一棵，或點一棵樹把它移掉 ----------
+  let treeWait = null, treeSaved = () => {};
+  function treeTap(ray, px, py, rect) {
+    if (treeTool === 'add') {
+      const hits = ray.intersectObjects(hillOnly.filter((o) => o && o.isMesh)), pt = hits.length ? hits[0].point : ray.ray.intersectPlane(new T.Plane(new T.Vector3(0, 1, 0), 0), new T.Vector3());
+      if (!pt || Math.abs(pt.x) > HW - 2 || Math.abs(pt.z) > HH - 2) return;
+      if (D.buildings.some((b) => inside({ x: pt.x, y: -pt.z }, b.p))) return;      // 點到房子的位置不種（樹會被房子蓋住）
+      TREES.add.push([+pt.x.toFixed(1), +(-pt.z).toFixed(1), +(0.8 + Math.random() * 0.5).toFixed(2), Math.floor(Math.random() * 6)]);
+    } else {
+      let best = null, bd = 30;                                                 // 在畫面上找離點擊位置最近的那棵（30 像素內）
+      treeShown.flat.concat(treeShown.hill).forEach((t) => {
+        v.set(t[0], 0.5 + (t[5] ? 0.2 + t[5] * RISE : 0) + 7 * t[2], -t[1]).project(camera);
+        const d = Math.hypot((v.x + 1) / 2 * rect.width - px, (1 - v.y) / 2 * rect.height - py);
+        if (d < bd) { bd = d; best = t; }
+      });
+      if (!best) return;
+      if (best[6]) TREES.add.splice(best[6] - 1, 1); else TREES.cut.push([best[0], best[1]]);
+    }
+    try { localStorage.setItem(STORE + '-trees', JSON.stringify(TREES)); } catch (e) { /* 只留在這一次 */ }
+    treeSaved();
+    clearTimeout(treeWait); treeWait = setTimeout(build, 120);
   }
 
   // ---------- 開始 ----------
