@@ -16,8 +16,8 @@ window.ATLAS_STYLE = {
     wall: '#ffe0e0',                    // 建築
     tint: '#ffe0e0',                    // 市場周邊的房子
     deck: '#c86c5f',                    // 高架橋
-    busLane: '#38c6b8',                    // 公車專用道
-    zebra: '#fffdf6',                    // 斑馬線
+    busLane: '#56d2c6',                    // 公車專用道
+    zebra: '#c95454',                    // 斑馬線
     key2: '#ffb92e',                    // 地標／天橋
     heroBlue: '#1a44c8',                    // 市場　深藍
     heroSky: '#2f8fe6',                    // 市場　淺藍
