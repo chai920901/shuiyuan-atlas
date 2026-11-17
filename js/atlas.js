@@ -1319,7 +1319,7 @@
     document.getElementById('src-close').addEventListener('click', () => { src.hidden = true; });
     // 調色
     if (!EDIT) return;                                                         // 發布出去的網站到這裡為止，沒有調色與輸出的介面
-    panel.insertAdjacentHTML('beforeend', '<div id="set-edit"><h2>輸出</h2><button id="atlas-render" title="把現在的角度存成 PNG；按住 Shift 再按，背景透明">Render 存成 PNG</button>' +
+    panel.insertAdjacentHTML('beforeend', '<div id="set-edit"><h2>發布</h2><button id="set-publish">發布到網站</button><p class="set-tip" id="set-publish-tip">把現在的顏色、樹和人存進檔案並上傳到 GitHub。要用資料夾裡的「編輯地圖.command」打開才能用。</p><h2>輸出</h2><button id="atlas-render" title="把現在的角度存成 PNG；按住 Shift 再按，背景透明">Render 存成 PNG</button>' +
       '<p class="set-tip">存的是現在畫面的角度。按住 Shift 再按，背景是透明的。</p><h2>畫面</h2><button id="set-wc"></button><h2>樹與人</h2><div id="set-tree" class="set-pick"><button data-tool="add">種樹</button><button data-tool="cut">移除樹</button></div><div id="set-people-tool" class="set-pick" style="margin-top:6px"><button data-tool="padd">放人</button><button data-tool="pcut">移除人</button></div>' +
       '<p class="set-tip" id="set-tree-tip"></p><button id="set-tree-mix"></button><div id="set-tree-lib"></div><p class="set-tip">樹的圖鑑：亮著的是地圖上會出現的種類，點一下開或關。按了「種樹」之後再點其中一種，就只種那一種（再點一次回到隨機）。</p><button id="set-tree-copy">複製 trees.js 的內容</button><textarea id="set-tree-out" rows="3" readonly></textarea><button id="set-tree-reset">回到檔案裡的樹和人</button><h2>山的圖案</h2><div id="set-hill" class="set-pick"></div><h2>顏色</h2><div id="set-colors"></div><button id="set-reset">回到檔案裡的顏色</button>' +
       '<p class="set-tip">這一區只有在自己電腦上預覽時才會出現。調好之後跟 Claude 說「存顏色」，或按下面的按鈕複製，貼到 data/style.js 蓋掉原本的內容再上傳。</p>' +
@@ -1380,6 +1380,16 @@
     mixBtn.addEventListener('click', () => { treeMix = treeMix === 'zone' ? 'random' : 'zone'; try { localStorage.setItem(STORE + '-treemix', treeMix); } catch (e) { /* 只留在這一次 */ } mixShow(); out.value = text(); build(); });
     mixShow();
     treeSaved();
+    // 一鍵發布：交給本機的小伺服器（tools/edit-server.py）存檔、commit、push
+    const pub = document.getElementById('set-publish'), pubTip = document.getElementById('set-publish-tip');
+    pub.addEventListener('click', () => {
+      pub.disabled = true; pubTip.textContent = '發布中⋯';
+      fetch('/publish', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Atlas': '1' }, body: JSON.stringify({ style: text(), trees: treeOut.value }) })
+        .then((r) => (r.headers.get('Content-Type') || '').includes('json') ? r.json() : Promise.reject(new Error('no server')))
+        .then((d) => { pubTip.textContent = d.message; })
+        .catch(() => { pubTip.textContent = '這個視窗不能直接發布。請關掉它，改對專案資料夾裡的「編輯地圖.command」按兩下打開，再按一次。'; })
+        .then(() => { pub.disabled = false; });
+    });
     const hillBox = document.getElementById('set-hill');
     HILLS.forEach(([k, label]) => {
       const b = document.createElement('button');

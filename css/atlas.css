@@ -227,3 +227,7 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
 #set-tree-lib button.on { opacity: 1; }
 #set-tree-lib button.brush { background: var(--ink); color: var(--paper); }
 #set-tree-lib img { display: block; width: 100%; height: 54px; object-fit: contain; }
+
+/* ---------- 發布 ---------- */
+#set-publish { width: 100%; padding: 10px 0; font-size: 13px; font-weight: 900; letter-spacing: .16em; background: var(--red); color: #fff; border: 1.5px solid var(--ink); }
+#set-publish:disabled { opacity: .5; }
