@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/atlas.css?v=24">
+  <link rel="stylesheet" href="css/atlas.css?v=25">
 </head>
 <body>
 
@@ -18,7 +18,7 @@
   <main id="atlas">
     <!-- 天空：太陽、月亮、雲、星星，畫在地圖後面 -->
     <!-- 水彩濾鏡：把畫面邊緣微微扭動，再疊一層紙的斑駁 -->
-    <svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="wc" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="4" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="3.5" xChannelSelector="R" yChannelSelector="G"/></filter></svg>
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="crayon" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="2" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.6" xChannelSelector="R" yChannelSelector="G"/></filter><filter id="wc" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="4" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="3.5" xChannelSelector="R" yChannelSelector="G"/></filter></svg>
     <div id="atlas-sky">
       <i class="star" style="left:12%;top:14%"></i><i class="star" style="left:31%;top:8%"></i><i class="star" style="left:58%;top:12%"></i>
       <i class="star" style="left:77%;top:20%"></i><i class="star" style="left:88%;top:9%"></i><i class="star" style="left:44%;top:22%"></i>
@@ -65,6 +65,13 @@
     <aside id="atlas-panel" hidden>
       <button id="set-close" aria-label="關閉">✕</button>
       <h2>時間與天氣 <b id="set-clock"></b></h2>
+      <svg id="set-dial" viewBox="0 0 200 200" role="img" aria-label="時鐘，拖曳可以調時間">
+        <g id="dial-nums"></g>
+        <line id="dial-min" x1="100" y1="104" x2="100" y2="36"/>
+        <line id="dial-hour" x1="100" y1="104" x2="100" y2="58"/>
+        <circle cx="100" cy="100" r="6.5"/>
+      </svg>
+      <div id="set-ampm" class="set-pick"><button data-pm="0">上午</button><button data-pm="1">下午</button></div>
       <input id="set-time" type="range" min="0" max="23.75" step="0.25">
       <div id="set-weather"></div>
       <button id="set-now">回到現在的時間</button>
@@ -112,6 +119,6 @@
   <script src="data/detail.js?v=1"></script>
   <!-- 這兩個檔案常改，加上時間戳記，免得瀏覽器拿到舊的 -->
   <script>document.write('<script src="data/site.js?t=' + Date.now() + '"><\/script><script src="data/style.js?t=' + Date.now() + '"><\/script><script src="data/trees.js?t=' + Date.now() + '"><\/script>');</script>
-  <script src="js/atlas.js?v=24"></script>
+  <script src="js/atlas.js?v=25"></script>
 </body>
 </html>

@@ -34,6 +34,10 @@
   // 樹：地圖資料自動種的，加上手動加的（add），扣掉手動移掉的（cut）。發布的版本讀 data/trees.js；自己電腦上編輯時先存在瀏覽器裡
   const TREES = { add: ((window.ATLAS_TREES || {}).add || []).slice(), cut: ((window.ATLAS_TREES || {}).cut || []).slice() };
   if (EDIT) { try { const v = JSON.parse(localStorage.getItem(STORE + '-trees') || 'null'); if (v) { TREES.add = v.add || []; TREES.cut = v.cut || []; } } catch (e) { /* 用檔案裡的 */ } }
+  let treeSet = (STYLE.trees || []).filter((k) => k >= 0 && k < 12), treeBrush = -1;   // treeSet：地圖上用哪幾種樹；treeBrush：種樹時指定種哪一種（-1 是隨機）
+  if (EDIT) { try { const v = JSON.parse(localStorage.getItem(STORE + '-treeset') || 'null'); if (v && v.length) treeSet = v; } catch (e) { /* 用檔案裡的 */ } }
+  if (!treeSet.length) treeSet = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+  const treeKind = (t) => (t[3] >= 100 ? t[3] - 100 : treeSet[(Math.abs(Math.round(t[0] * 7 + t[1] * 13)) + t[3]) % treeSet.length]);   // 這棵樹是圖鑑裡的哪一種
   let treeTool = '', treeShown = { flat: [], hill: [] };                        // treeTool：'' 沒在用、'add' 種樹、'cut' 移除
   function treeList() {
     const gone = (t) => TREES.cut.some((c) => Math.abs(c[0] - t[0]) < 0.6 && Math.abs(c[1] - t[1]) < 0.6);
@@ -174,45 +178,58 @@
     for (let x = 0; x < w; x += 16) g.fillRect(x, 0, 2, h);
   }), 6.4);
 
-  // 樹：水滴形的樹冠、點描、白色枝條。六種顏色排成 3 × 2
-  const TREE_FILL = ['#c6bd55', '#9fbf7a', '#6fae9c', '#86aecb', '#d7cf74', '#4f978b'];
-  const TREE_DOT = ['#e3dc8c', '#c9dba5', '#a7d2c4', '#b9d3e6', '#f0ebb0', '#86c0b3'];
-  const TREE_SPECK = ['#b0577a', '#557f4a', '#3f7f76', '#c25f86', '#a39a3c', '#2f6f69'];
-  function texTrees() {
-    const CW = 160, CH = 256;
-    const c = sheet(CW * 3, CH * 2, (g) => {
-      for (let v = 0; v < 6; v++) {
-        g.save(); g.translate((v % 3) * CW, Math.floor(v / 3) * CH);
-        const cx = CW / 2, top = 10, bot = CH - 44, r = CW * 0.4;
-        const crown = () => {
-          g.beginPath(); g.moveTo(cx, top);
-          g.bezierCurveTo(cx + r * 0.42, top + (bot - top) * 0.34, cx + r, bot - r * 1.5, cx + r, bot - r);
-          g.arc(cx, bot - r, r, 0, Math.PI);
-          g.bezierCurveTo(cx - r, bot - r * 1.5, cx - r * 0.42, top + (bot - top) * 0.34, cx, top);
-          g.closePath();
-        };
-        crown(); g.fillStyle = TREE_FILL[v]; g.fill();
-        g.save(); crown(); g.clip();
-        for (let i = 0; i < 420; i++) {
-          const k = rnd();
-          g.fillStyle = k < 0.6 ? TREE_DOT[v] : k < 0.86 ? TREE_SPECK[v] : '#ffffff';
-          g.globalAlpha = 0.55 + rnd() * 0.45;
-          g.fillRect(rnd() * CW, rnd() * CH, 2 + rnd() * 3, 2 + rnd() * 3);
-        }
-        g.restore();
-        g.globalAlpha = 1; g.strokeStyle = '#fbfaf2'; g.lineCap = 'round';
-        const limb = (x1, y1, x2, y2, w) => { g.lineWidth = w; g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); };
-        limb(cx, CH - 4, cx, top + 52, 5);                                      // 樹幹一路往上
-        for (let i = 0; i < 4; i++) {                                           // 左右交錯的枝
-          const y = bot - r * 0.5 - i * 34, len = (r * 0.78) * (1 - i * 0.17), side = i % 2 ? 1 : -1;
-          limb(cx, y, cx + side * len, y - len * 0.9, 3.4);
-          limb(cx + side * len * 0.5, y - len * 0.45, cx + side * len * 0.5, y - len * 0.45 - len * 0.5, 2.4);
-          limb(cx, y + 14, cx - side * len * 0.7, y + 14 - len * 0.62, 3);
-        }
-        g.restore();
-      }
+  // ---------- 蠟筆與水彩的筆觸：畫好一格之後疊上去 ----------
+  function crayon(c, w, h) {                                                    // 蠟筆：一撇一撇深淺不一，偶爾露出紙的白點
+    c.globalCompositeOperation = 'source-atop'; c.lineCap = 'round';
+    for (let i = 0; i < 300; i++) {
+      const x = rnd() * w, y = rnd() * h, l = 4 + rnd() * 10;
+      c.strokeStyle = rnd() < 0.6 ? 'rgba(255,255,255,.2)' : 'rgba(40,25,20,.1)'; c.lineWidth = 1 + rnd() * 1.6;
+      c.beginPath(); c.moveTo(x, y); c.lineTo(x + l * 0.8, y - l); c.stroke();
+    }
+    c.globalCompositeOperation = 'destination-out'; c.fillStyle = '#000';
+    for (let i = 0; i < 80; i++) c.fillRect(rnd() * w, rnd() * h, 1.2, 1.2 + rnd() * 2);
+    c.globalCompositeOperation = 'source-over';
+  }
+  function watery(c, w, h) {                                                    // 水彩：上面淡、下面積得濃，顏料不均勻
+    c.globalCompositeOperation = 'source-atop';
+    const wash = c.createLinearGradient(0, 0, 0, h);
+    wash.addColorStop(0, 'rgba(255,250,240,.26)'); wash.addColorStop(0.6, 'rgba(255,250,240,0)'); wash.addColorStop(1, 'rgba(40,30,10,.14)');
+    c.fillStyle = wash; c.fillRect(0, 0, w, h);
+    for (let n = 0; n < 22; n++) { c.fillStyle = rnd() < 0.55 ? 'rgba(255,250,238,.16)' : 'rgba(40,40,20,.1)'; c.beginPath(); c.arc(rnd() * w, rnd() * h, 6 + rnd() * 22, 0, Math.PI * 2); c.fill(); }
+    c.globalCompositeOperation = 'source-over';
+  }
+
+  // ---------- 樹的圖鑑：十二種水彩畫的樹，排成 6 × 2。地圖上用哪幾種由 treeSet 決定 ----------
+  const TREE_NAMES = ['水滴', '同心圓', '葉片', '橫紋', '圓葉', '針葉', '層疊', '松', '藍水滴', '枯枝', '秋色', '淡黃'];
+  const TW = 160, TH = 256;
+  function treeCell(kind) {
+    return sheet(TW, TH, (g) => {
+      const cx = TW / 2, G = TH - 4;
+      g.lineCap = g.lineJoin = 'round';
+      const ell = (x, y, rx, ry, rot) => { g.beginPath(); g.ellipse(x, y, rx, ry, rot || 0, 0, Math.PI * 2); };
+      const line = (col, wd, ...pts) => { g.strokeStyle = col; g.lineWidth = wd; g.beginPath(); pts.forEach((q, i) => (i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]))); g.stroke(); };
+      const inside = (path, draw) => { g.save(); path(); g.clip(); draw(); g.restore(); };
+      const drop = (top, bot, r) => { g.beginPath(); g.moveTo(cx, top); g.bezierCurveTo(cx + r * 0.42, top + (bot - top) * 0.34, cx + r, bot - r * 1.5, cx + r, bot - r); g.arc(cx, bot - r, r, 0, Math.PI); g.bezierCurveTo(cx - r, bot - r * 1.5, cx - r * 0.42, top + (bot - top) * 0.34, cx, top); g.closePath(); };
+      const waves = (col, wd, y0, y1, gap, amp) => { g.strokeStyle = col; g.lineWidth = wd; for (let y = y0; y < y1; y += gap) { g.beginPath(); for (let x = 0; x <= TW; x += 6) g.lineTo(x, y + Math.sin(x / 11 + y) * amp); g.stroke(); } };
+      [
+        () => { drop(10, G - 40, 62); g.fillStyle = '#9fbf7a'; g.fill(); line('#fbfaf2', 5, [cx, G], [cx, 62]); [0, 1, 2, 3].forEach((i) => { const y = G - 74 - i * 34, l = 46 * (1 - i * 0.17), sd = i % 2 ? 1 : -1; line('#fbfaf2', 3.4, [cx, y], [cx + sd * l, y - l * 0.9]); line('#fbfaf2', 3, [cx, y + 14], [cx - sd * l * 0.7, y + 14 - l * 0.62]); }); },
+        () => { ell(cx, 92, 64, 78); g.fillStyle = '#d3e3b6'; g.fill(); [0.84, 0.64, 0.44, 0.24].forEach((k) => { ell(cx, 96, 64 * k, 78 * k); g.strokeStyle = '#6f9a5c'; g.lineWidth = 3; g.stroke(); }); line('#8a5a3a', 9, [cx, G], [cx, 118]); line('#8a5a3a', 5, [cx, 150], [cx - 24, 112]); line('#8a5a3a', 5, [cx, 140], [cx + 22, 104]); },
+        () => { line('#7a5236', 9, [cx, G], [cx, 120]); ell(cx, 94, 54, 80); g.fillStyle = '#86b060'; g.fill(); inside(() => ell(cx, 94, 54, 80), () => { g.strokeStyle = '#3f7a3a'; g.lineWidth = 3; for (let i = 0; i < 110; i++) { const x = rnd() * TW, y = rnd() * 180; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 3, y + 7); g.stroke(); } }); line('#7a5236', 6, [cx, 170], [cx, 60]); },
+        () => { ell(cx, 88, 52, 74); g.fillStyle = '#cfe0a2'; g.fill(); inside(() => ell(cx, 88, 52, 74), () => waves('#8fb05c', 3, 20, 170, 12, 3)); line('#f1ede2', 10, [cx, G], [cx, 128]); for (let y = 140; y < G; y += 14) line('#5c5348', 2.4, [cx - 4, y], [cx + 2, y + 2]); },
+        () => { line('#d9a441', 7, [cx, G], [cx, 96]); line('#d9a441', 4, [cx, 150], [cx - 30, 104]); line('#d9a441', 4, [cx, 136], [cx + 30, 96]); ell(cx, 82, 72, 52); g.fillStyle = '#a3bcad'; g.fill(); [[40, 70], [70, 56], [104, 62], [124, 88], [56, 100], [90, 92], [30, 92]].forEach(([x, y], i) => { ell(x, y, 9, 4.5, i * 0.9); g.fillStyle = '#3f5f55'; g.fill(); }); },
+        () => { line('#8a8478', 10, [cx, G], [cx, 206]); g.beginPath(); g.moveTo(cx, 12); g.quadraticCurveTo(cx + 34, 110, cx + 54, 204); g.quadraticCurveTo(cx, 222, cx - 54, 204); g.quadraticCurveTo(cx - 34, 110, cx, 12); g.closePath(); g.fillStyle = '#3f7d62'; g.fill(); g.fillStyle = '#cfe3d2'; [[80, 60], [66, 96], [96, 104], [56, 140], [84, 142], [108, 150], [44, 182], [74, 184], [102, 188], [124, 192]].forEach(([x, y]) => { g.beginPath(); g.arc(x, y, 3, 0, Math.PI * 2); g.fill(); }); },
+        () => { line('#a0522d', 6, [cx, G], [cx, 50]); [[58, 34, 17], [112, 44, 19], [170, 56, 25]].forEach(([y, rx, ry]) => { ell(cx, y, rx, ry); g.fillStyle = '#4f8a5a'; g.fill(); inside(() => ell(cx, y, rx, ry), () => { g.strokeStyle = '#2f6340'; g.lineWidth = 2.4; for (let x = 10; x < TW; x += 8) { g.beginPath(); g.moveTo(x, y - 30); g.lineTo(x, y + 30); g.stroke(); } }); }); },
+        () => { line('#8a4a2e', 7, [cx, G], [cx, 84]); line('#8a4a2e', 4, [cx, 190], [44, 160]); line('#8a4a2e', 4, [cx, 200], [120, 176]); [[cx, 66, 36, 44], [40, 150, 24, 22], [122, 168, 22, 20]].forEach(([x, y, rx, ry]) => { ell(x, y, rx, ry); g.fillStyle = '#4f8a6a'; g.fill(); g.strokeStyle = '#2c5a44'; g.lineWidth = 2; for (let a = 0; a < 16; a++) { const t = (a / 16) * Math.PI * 2; g.beginPath(); g.moveTo(x, y + ry * 0.5); g.lineTo(x + Math.cos(t) * rx * 0.9, y + Math.sin(t) * ry * 0.9); g.stroke(); } }); },
+        () => { drop(14, G - 30, 58); g.fillStyle = '#a6cddb'; g.fill(); g.save(); g.translate(cx, G - 88); [0.8, 0.6].forEach((k) => { g.save(); g.scale(k, k); g.translate(-cx, -(G - 88)); drop(14, G - 30, 58); g.strokeStyle = '#4f86a0'; g.lineWidth = 3 / k; g.stroke(); g.restore(); }); g.restore(); line('#7a5a3a', 8, [cx, G], [cx, 70]); line('#7a5a3a', 4, [cx, 170], [cx - 22, 130]); line('#7a5a3a', 4, [cx, 150], [cx + 20, 110]); line('#7a5a3a', 3, [cx, 120], [cx - 14, 92]); },
+        () => { line('#a9703c', 11, [cx, G], [cx, 110]); [[-34, 50, 7], [34, 44, 7], [-14, 26, 5], [16, 20, 5]].forEach(([dx, y, wd]) => line('#a9703c', wd, [cx, 120 + Math.abs(dx)], [cx + dx, y])); line('#a9703c', 4, [cx - 22, 100], [cx - 46, 76]); line('#a9703c', 4, [cx + 22, 96], [cx + 48, 70]); for (let y = 130; y < G; y += 12) line('#7a4a22', 2, [cx - 5, y], [cx + 5, y + 1]); },
+        () => { line('#5c5c4a', 10, [cx, G], [cx, 100]); for (let y = 120; y < G; y += 16) line('#d8d2b4', 3, [cx - 5, y], [cx + 5, y - 4]); line('#5c5c4a', 4, [cx, 140], [cx - 24, 104]); line('#5c5c4a', 4, [cx, 132], [cx + 24, 100]); ell(cx, 76, 68, 50); g.fillStyle = '#f2a93b'; g.fill(); inside(() => ell(cx, 76, 68, 50), () => waves('#d9801e', 3, 30, 130, 11, 3)); },
+        () => { g.beginPath(); g.moveTo(34, 36); g.quadraticCurveTo(cx, 26, 128, 38); g.quadraticCurveTo(140, 96, 126, 150); g.quadraticCurveTo(cx, 160, 32, 150); g.quadraticCurveTo(20, 92, 34, 36); g.closePath(); g.fillStyle = '#eef0b8'; g.fill(); line('#4a4438', 8, [cx, G], [cx, 56]); [[190, -26, 150], [176, 24, 138], [146, -30, 104], [128, 28, 88], [100, -20, 70]].forEach(([y, dx, y2]) => line('#4a4438', 4, [cx, y], [cx + dx, y2])); },
+      ][kind]();
+      watery(g, TW, TH);
     });
-    const t = new T.CanvasTexture(c);
+  }
+  function texTrees() {
+    const t = new T.CanvasTexture(sheet(TW * 6, TH * 2, (g) => { for (let k = 0; k < 12; k++) g.drawImage(treeCell(k), (k % 6) * TW, Math.floor(k / 6) * TH); }));
     t.anisotropy = 4;
     return t;
   }
@@ -778,62 +795,70 @@
     grp.add(m); scene.add(grp); growers.push(mat);
     return grp;
   }
-  // 小人：水彩筆觸的剪影。八種正在做事的姿勢（走路、提菜、講電話、騎車、推菜籃車、撐傘、牽小孩、遛狗）× 三排顏色，共 24 種
-  const PEOPLE_HUE = ['#7d4a3a', '#b06a2c', '#6f6a66', '#8c3b3f', '#8a7a35', '#5d4b70', '#a3543a', '#4f6150', '#c08a4a', '#93505c', '#3f4a5a', '#9a6b4f', '#b5503c', '#6b5a48', '#77803f', '#a56a7a', '#4a5f6e', '#c79a5a', '#8a4f33', '#5a4a44', '#9c7b3a', '#7a3f4f', '#55664f', '#b9794e'];
+  // 小人：蠟筆畫的人，有頭髮、上衣、褲子或裙子。8 × 3 共 24 種；其中一格是小孩、一格是狗
   function texPeople() {
     const CW = 96, CH = 128;
+    const SKIN = ['#f2c9a8', '#e8b08a', '#c98d62', '#8d5a3b', '#f6d7c0'], HAIR = ['#2b2622', '#6b4a2e', '#c9742e', '#d9b25a', '#9a9a9a', '#b5412c'];
+    const TOP = ['#2f2c2c', '#b9b3ab', '#6f7f4a', '#3f8f86', '#c8a13a', '#e9a7b4', '#9db7dc', '#8a5a3a', '#f4f1e8', '#d8553a', '#5f6fb0', '#c98f6a'];
+    const BOT = ['#9db7dc', '#2f4f9a', '#c8962e', '#e0559a', '#8c2f34', '#6f8a3a', '#2f2c2c', '#b7a48c', '#f0d24a', '#c4b8e0'];
     const figure = (g, i) => {
-      g.fillStyle = g.strokeStyle = '#000'; g.lineCap = g.lineJoin = 'round';
-      const L = (wd, ...pts) => { g.lineWidth = wd * 1.28; g.beginPath(); pts.forEach((q, n) => (n ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]))); g.stroke(); };
-      const dot = (x, y, r) => { g.beginPath(); g.arc(x, y, r * 1.08, 0, Math.PI * 2); g.fill(); };
-      const walker = (d, arms) => {                                             // 跨步走的人；d 是左右位移
-        dot(50 + d, 15, 8.5); L(15, [49 + d, 33], [47 + d, 66]);
-        L(8, [47 + d, 66], [56 + d, 94], [60 + d, 121]); L(8, [47 + d, 66], [38 + d, 94], [28 + d, 119]);
-        L(6, [60 + d, 122], [67 + d, 122]); L(6, [28 + d, 120], [35 + d, 123]);
-        if (arms) { L(6, [49 + d, 35], [40 + d, 52], [34 + d, 64]); L(6, [49 + d, 35], [57 + d, 52], [63 + d, 62]); }
-      };
-      const stand = (d, top) => { dot(48 + d, top, 8.5); L(15, [48 + d, top + 18], [48 + d, top + 52]); L(8, [48 + d, top + 52], [44 + d, 122]); L(8, [48 + d, top + 52], [53 + d, 122]); };
-      [
-        () => walker(0, true),
-        () => { walker(0, true); g.fillRect(24, 64, 16, 19); g.fillRect(56, 62, 15, 18); },                                   // 兩手提菜
-        () => { stand(0, 15); L(6, [48, 35], [60, 48], [55, 24]); L(6, [48, 35], [40, 54], [41, 70]); },                      // 講電話
-        () => {                                                                                                               // 騎腳踏車
-          g.lineWidth = 3.6; [22, 74].forEach((x) => { g.beginPath(); g.arc(x, 105, 16, 0, Math.PI * 2); g.stroke(); });
-          L(3, [22, 105], [40, 84], [62, 84], [74, 105]); L(3, [40, 84], [48, 105], [62, 84]); L(3, [40, 84], [38, 74]); L(3, [62, 84], [64, 70], [71, 68]);
-          dot(61, 29, 8.5); L(13, [38, 70], [54, 45]); L(5.5, [54, 47], [62, 60], [69, 68]); L(7, [38, 70], [53, 87], [48, 104]); L(7, [38, 70], [46, 86], [40, 98]);
-        },
-        () => {                                                                                                               // 推菜籃車
-          dot(35, 17, 8.5); L(15, [33, 35], [29, 68]); L(8, [29, 68], [37, 96], [39, 121]); L(8, [29, 68], [21, 96], [11, 119]); L(6, [39, 122], [46, 122]); L(6, [11, 120], [18, 123]);
-          L(6, [33, 38], [47, 52], [59, 56]); L(3, [59, 56], [63, 70]); g.fillRect(61, 66, 28, 27); L(3, [65, 92], [65, 112]); L(3, [85, 92], [85, 112]); dot(65, 117, 5); dot(85, 117, 5);
-        },
-        () => {                                                                                                               // 撐傘
-          stand(-2, 32); g.beginPath(); g.ellipse(54, 18, 36, 14, 0, Math.PI, 0); g.closePath(); g.fill();
-          L(2.6, [56, 18], [56, 54]); L(6, [46, 52], [53, 62], [56, 52]); L(6, [46, 52], [38, 68], [39, 84]);
-        },
-        () => {                                                                                                               // 牽小孩
-          walker(-12, false); L(6, [37, 35], [28, 52], [22, 64]); L(5.5, [37, 35], [50, 56], [62, 74]);
-          dot(73, 64, 6.5); L(11, [73, 78], [73, 98]); L(6, [73, 98], [69, 122]); L(6, [73, 98], [78, 122]); L(4.5, [73, 80], [62, 74]);
-        },
-        () => {                                                                                                               // 遛狗
-          walker(-16, false); L(6, [33, 35], [24, 52], [18, 64]); L(6, [33, 35], [42, 52], [48, 62]);
-          L(2.2, [48, 62], [72, 102]); L(9, [68, 108], [85, 108]); dot(89, 101, 5.5); L(3, [69, 108], [68, 122]); L(3, [84, 108], [85, 122]); L(3, [67, 106], [60, 98]);
-        },
-      ][i]();
+      const cx = CW / 2, skin = SKIN[i % 5], hair = HAIR[(i * 5 + 1) % 6], top = TOP[(i * 7 + 3) % 12], bot = BOT[(i * 3 + 2) % 10], type = i % 4;
+      const rr = (x, y, w, h, r, col) => { g.fillStyle = col; g.beginPath(); g.moveTo(x + r, y); g.lineTo(x + w - r, y); g.quadraticCurveTo(x + w, y, x + w, y + r); g.lineTo(x + w, y + h - r); g.quadraticCurveTo(x + w, y + h, x + w - r, y + h); g.lineTo(x + r, y + h); g.quadraticCurveTo(x, y + h, x, y + h - r); g.lineTo(x, y + r); g.quadraticCurveTo(x, y, x + r, y); g.closePath(); g.fill(); };
+      const dot = (x, y, r, col) => { g.fillStyle = col; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); };
+      if (i === 23) {                                                           // 狗
+        rr(22, 74, 46, 20, 9, '#c9a06a'); rr(60, 58, 20, 20, 8, '#c9a06a'); rr(74, 66, 12, 9, 4, '#c9a06a');
+        [26, 36, 54, 62].forEach((x) => rr(x, 90, 6, 30, 3, '#c9a06a')); g.fillStyle = '#9a7444'; g.beginPath(); g.moveTo(62, 60); g.lineTo(60, 48); g.lineTo(69, 58); g.fill();
+        g.strokeStyle = '#c9a06a'; g.lineWidth = 5; g.lineCap = 'round'; g.beginPath(); g.moveTo(24, 78); g.lineTo(12, 66); g.stroke(); dot(74, 64, 1.6, '#2b2622');
+        return;
+      }
+      if (i === 7) { g.translate(cx * 0.34, CH * 0.34); g.scale(0.66, 0.66); }  // 小孩
+      const sw = type === 3 ? 19 : 15;                                          // 肩寬：穿大外套的寬一點
+      if (type === 1) {                                                         // 裙子
+        rr(cx - 9, 92, 6, 26, 3, skin); rr(cx + 3, 92, 6, 26, 3, skin);
+        g.fillStyle = bot; g.beginPath(); g.moveTo(cx - 13, 70); g.lineTo(cx + 13, 70); g.lineTo(cx + 19, 98); g.lineTo(cx - 19, 98); g.closePath(); g.fill();
+      } else if (type === 2) {                                                  // 走路：兩腳前後分開
+        g.fillStyle = bot; [[-1, -16], [1, 14]].forEach(([sd, dx]) => { g.beginPath(); g.moveTo(cx + sd * 2 - 6, 70); g.lineTo(cx + sd * 2 + 6, 70); g.lineTo(cx + dx + 6, 119); g.lineTo(cx + dx - 5, 119); g.closePath(); g.fill(); });
+      } else { rr(cx - 13, 70, 12, 49, 4, bot); rr(cx + 1, 70, 12, 49, 4, bot); }
+      [type === 2 ? -16 : -8, type === 2 ? 14 : 8].forEach((dx) => rr(cx + dx - 6, 116, 12, 6, 3, i % 3 ? '#3a3230' : '#c9a23a'));   // 鞋子
+      rr(cx - sw - 6, 37, 8, 36, 4, top); rr(cx + sw - 2, 37, 8, 36, 4, top);    // 手臂
+      dot(cx - sw - 2, 75, 3.6, skin); dot(cx + sw + 2, 75, 3.6, skin);
+      rr(cx - sw, 33, sw * 2, type === 3 ? 48 : 41, 8, top);                     // 上衣
+      if (i % 3 === 0) { g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 2; for (let y = 40; y < 70; y += 7) { g.beginPath(); g.moveTo(cx - sw + 3, y); g.lineTo(cx + sw - 3, y); g.stroke(); } }   // 條紋
+      else if (i % 3 === 1) { for (let n = 0; n < 9; n++) dot(cx - sw + 5 + ((n * 11) % (sw * 2 - 8)), 40 + ((n * 17) % 28), 1.8, 'rgba(30,20,20,.45)'); }                                              // 點點
+      if (i === 15) rr(cx + sw + 1, 74, 13, 15, 3, '#d9b25a');                   // 提袋
+      dot(cx, 22, 10.5, skin);                                                  // 頭
+      g.fillStyle = hair; g.beginPath(); g.arc(cx, 20, 11, Math.PI * 1.02, Math.PI * 1.98); g.closePath(); g.fill();
+      if (i % 4 === 1) { rr(cx - 12, 16, 6, 22, 3, hair); rr(cx + 6, 16, 6, 22, 3, hair); } else if (i % 4 === 3) dot(cx, 8, 5, hair);   // 長髮、包頭
+      dot(cx - 4, 23, 1.3, '#2b2622'); dot(cx + 4, 23, 1.3, '#2b2622'); dot(cx - 7, 27, 2.2, 'rgba(230,110,110,.5)'); dot(cx + 7, 27, 2.2, 'rgba(230,110,110,.5)');
     };
     const t = new T.CanvasTexture(sheet(CW * 8, CH * 3, (g) => {
-      for (let row = 0; row < 3; row++) for (let i = 0; i < 8; i++) {
-        const cell = sheet(CW, CH, (c) => {
-          figure(c, i);
-          c.globalCompositeOperation = 'source-in';                             // 剪影換成顏料的顏色
-          c.fillStyle = PEOPLE_HUE[row * 8 + i]; c.fillRect(0, 0, CW, CH);
-          c.globalCompositeOperation = 'source-atop';                           // 水彩：顏料不均勻，上面淡、下面積得比較濃
-          const wash = c.createLinearGradient(0, 0, 0, CH);
-          wash.addColorStop(0, 'rgba(255,250,240,.34)'); wash.addColorStop(0.55, 'rgba(255,250,240,0)'); wash.addColorStop(1, 'rgba(40,20,10,.2)');
-          c.fillStyle = wash; c.fillRect(0, 0, CW, CH);
-          for (let n = 0; n < 16; n++) { c.fillStyle = rnd() < 0.55 ? 'rgba(255,248,235,.2)' : 'rgba(50,25,15,.16)'; c.beginPath(); c.arc(rnd() * CW, rnd() * CH, 5 + rnd() * 16, 0, Math.PI * 2); c.fill(); }
-        });
-        g.drawImage(cell, i * CW, row * CH);
-      }
+      for (let i = 0; i < 24; i++) g.drawImage(sheet(CW, CH, (c) => { c.save(); figure(c, i); c.restore(); crayon(c, CW, CH); }), (i % 8) * CW, Math.floor(i / 8) * CH);
+    }));
+    t.anisotropy = 4;
+    return t;
+  }
+  // 車：蠟筆畫的側面。六格：橘車、杏色車、橘色機車（事件用），藍車、薄荷綠車、粉紅車（改善後用）
+  function texCars() {
+    const CW = 192, CH = 128, TONE = ['#f08a3c', '#f4b26a', '#f08a3c', '#6f9fd8', '#8fcdb4', '#f0a7bd'];
+    const t = new T.CanvasTexture(sheet(CW * 6, CH, (g) => {
+      TONE.forEach((tone, i) => g.drawImage(sheet(CW, CH, (c) => {
+        const dot = (x, y, r, col) => { c.fillStyle = col; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill(); };
+        const poly = (col, ...pts) => { c.fillStyle = col; c.beginPath(); pts.forEach((q, n) => (n ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1]))); c.closePath(); c.fill(); };
+        if (i === 2) {                                                          // 機車和騎士
+          dot(58, 104, 14, '#3a3230'); dot(134, 104, 14, '#3a3230'); dot(58, 104, 5, '#d8d2c4'); dot(134, 104, 5, '#d8d2c4');
+          poly(tone, [50, 92], [70, 70], [112, 70], [126, 58], [136, 62], [130, 96], [70, 98]);
+          poly('#5f6fb0', [84, 70], [80, 38], [102, 34], [112, 70]); poly('#5f6fb0', [100, 40], [128, 56], [124, 62], [98, 50]);   // 騎士的身體和手
+          poly('#2f4f9a', [84, 68], [112, 68], [118, 96], [104, 98], [100, 80], [84, 80]);
+          dot(92, 24, 12, '#f4f1e8'); poly('#2b2622', [86, 26], [104, 22], [104, 28], [88, 31]);
+        } else {
+          dot(52, 100, 15, '#3a3230'); dot(142, 100, 15, '#3a3230'); dot(52, 100, 6, '#d8d2c4'); dot(142, 100, 6, '#d8d2c4');
+          poly(tone, [12, 96], [14, 70], [34, 60], [164, 60], [180, 72], [182, 96]);                                             // 車身
+          poly(tone, [44, 62], [60, 30], [128, 30], [150, 62]);                                                                   // 車頂
+          poly('#dff0f4', [54, 58], [66, 37], [92, 37], [92, 58]); poly('#dff0f4', [98, 58], [98, 37], [124, 37], [140, 58]);     // 車窗
+          dot(174, 76, 4, '#fff3a8'); dot(18, 78, 3.5, '#d8553a');
+        }
+        crayon(c, CW, CH);
+      }), i * CW, 0));
     }));
     t.anisotropy = 4;
     return t;
@@ -1180,6 +1205,12 @@
     const hh = Math.floor(t) % 24, mm = Math.round((t - Math.floor(t)) * 60);
     const clock = document.getElementById('set-clock');
     if (clock) clock.textContent = String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0') + '　' + w.label;
+    const hand = document.getElementById('dial-hour');                         // 手繪時鐘的指針
+    if (hand) {
+      hand.setAttribute('transform', 'rotate(' + ((t % 12) * 30).toFixed(1) + ' 100 100)');
+      document.getElementById('dial-min').setAttribute('transform', 'rotate(' + ((t % 1) * 360).toFixed(1) + ' 100 100)');
+      [...document.getElementById('set-ampm').children].forEach((b) => b.classList.toggle('on', (b.dataset.pm === '1') === (t >= 12)));
+    }
     if (stalls) stalls.visible = (forceStalls || nightTime()) && !survey;
     renderer.shadowMap.needsUpdate = true; dirty = true;
   }
@@ -1192,6 +1223,24 @@
     setBtn.textContent = EDIT ? '編輯' : '時間・天氣';                          // 時間與天氣大家都能調；調色和 Render 只有自己電腦上才有
     setBtn.addEventListener('click', () => { panel.hidden = !panel.hidden; });
     document.getElementById('set-close').addEventListener('click', () => { panel.hidden = true; });
+    // 手繪時鐘：紅色蠟筆的數字、藍色的指針。在鐘面上拖曳可以調時間，下面選上午或下午
+    const dial = document.getElementById('set-dial'), nums = document.getElementById('dial-nums');
+    for (let n = 1; n <= 12; n++) {
+      const a = (n / 12) * Math.PI * 2, el = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      el.setAttribute('x', (100 + Math.sin(a) * 80).toFixed(1)); el.setAttribute('y', (100 - Math.cos(a) * 80 + 8).toFixed(1));
+      el.setAttribute('transform', 'rotate(' + ((n * 37) % 17 - 8) + ' ' + (100 + Math.sin(a) * 80).toFixed(1) + ' ' + (100 - Math.cos(a) * 80).toFixed(1) + ')');
+      el.textContent = n; nums.appendChild(el);
+    }
+    const setFrom = (h) => { sky.manual = true; sky.time = Math.min(23.75, h); time.value = sky.time; applySky(); };
+    let turning = false;
+    const turn = (e) => {
+      const r = dial.getBoundingClientRect(), a = Math.atan2(e.clientX - r.left - r.width / 2, -(e.clientY - r.top - r.height / 2));
+      setFrom((Math.round((((a / (Math.PI * 2)) * 12 + 12) % 12) * 4) / 4) % 12 + (sky.time >= 12 ? 12 : 0));
+    };
+    dial.addEventListener('pointerdown', (e) => { turning = true; dial.setPointerCapture(e.pointerId); turn(e); });
+    dial.addEventListener('pointermove', (e) => { if (turning) turn(e); });
+    dial.addEventListener('pointerup', () => { turning = false; }); dial.addEventListener('pointercancel', () => { turning = false; });
+    [...document.getElementById('set-ampm').children].forEach((b) => b.addEventListener('click', () => setFrom((sky.time % 12) + (b.dataset.pm === '1' ? 12 : 0))));
     time.value = sky.time;
     time.addEventListener('input', () => { sky.manual = true; sky.time = +time.value; applySky(); });
     document.getElementById('set-now').addEventListener('click', () => { sky.manual = false; sky.time = clockNow(); time.value = sky.time; applySky(); });   // 回到現在的時刻
@@ -1215,14 +1264,14 @@
     if (!EDIT) return;                                                         // 發布出去的網站到這裡為止，沒有調色與輸出的介面
     panel.insertAdjacentHTML('beforeend', '<div id="set-edit"><h2>輸出</h2><button id="atlas-render" title="把現在的角度存成 PNG；按住 Shift 再按，背景透明">Render 存成 PNG</button>' +
       '<p class="set-tip">存的是現在畫面的角度。按住 Shift 再按，背景是透明的。</p><h2>畫面</h2><button id="set-wc"></button><h2>樹</h2><div id="set-tree" class="set-pick"><button data-tool="add">種樹</button><button data-tool="cut">移除樹</button></div>' +
-      '<p class="set-tip" id="set-tree-tip"></p><button id="set-tree-copy">複製 trees.js 的內容</button><textarea id="set-tree-out" rows="3" readonly></textarea><button id="set-tree-reset">回到檔案裡的樹</button><h2>山的圖案</h2><div id="set-hill" class="set-pick"></div><h2>顏色</h2><div id="set-colors"></div><button id="set-reset">回到檔案裡的顏色</button>' +
+      '<p class="set-tip" id="set-tree-tip"></p><div id="set-tree-lib"></div><p class="set-tip">樹的圖鑑：亮著的是地圖上會出現的種類，點一下開或關。按了「種樹」之後再點其中一種，就只種那一種（再點一次回到隨機）。</p><button id="set-tree-copy">複製 trees.js 的內容</button><textarea id="set-tree-out" rows="3" readonly></textarea><button id="set-tree-reset">回到檔案裡的樹</button><h2>山的圖案</h2><div id="set-hill" class="set-pick"></div><h2>顏色</h2><div id="set-colors"></div><button id="set-reset">回到檔案裡的顏色</button>' +
       '<p class="set-tip">這一區只有在自己電腦上預覽時才會出現。調好之後跟 Claude 說「存顏色」，或按下面的按鈕複製，貼到 data/style.js 蓋掉原本的內容再上傳。</p>' +
       '<button id="set-copy">複製 style.js 的內容</button><textarea id="set-out" rows="5" readonly></textarea></div>');
     const list = document.getElementById('set-colors'), out = document.getElementById('set-out');
     document.getElementById('atlas-render').addEventListener('click', (e) => shot(e.shiftKey));
     const text = () => {
       const lines = PALETTE.concat([['slab', '底座側邊'], ['pier', '橋墩']]).map(([k, label]) => "    " + k + ": '" + C[k] + "',".padEnd(22) + '// ' + label);
-      return '// 網站的顏色與天氣。由頁面上的調色面板產生。時間不用設定，網站會跟著看的人當下的時刻走。\nwindow.ATLAS_STYLE = {\n  palette: {\n' + lines.join('\n') + '\n  },\n  watercolor: ' + wc + ',\n  hillPattern: \'' + hillKind + '\',\n  weather: \'' + sky.weather + '\',\n};\n';
+      return '// 網站的顏色與天氣。由頁面上的調色面板產生。時間不用設定，網站會跟著看的人當下的時刻走。\nwindow.ATLAS_STYLE = {\n  palette: {\n' + lines.join('\n') + '\n  },\n  trees: [' + treeSet.join(', ') + '],\n  watercolor: ' + wc + ',\n  hillPattern: \'' + hillKind + '\',\n  weather: \'' + sky.weather + '\',\n};\n';
     };
     let wait = null;
     const inputs = {}, store = () => {
@@ -1256,6 +1305,20 @@
       try { localStorage.removeItem(STORE + '-trees'); } catch (e) { /* 沒關係 */ }
       treeSaved(); build();
     });
+    const lib = document.getElementById('set-tree-lib');
+    const libShow = () => [...lib.children].forEach((b, k) => { b.classList.toggle('on', treeSet.includes(k)); b.classList.toggle('brush', treeBrush === k); });
+    TREE_NAMES.forEach((name, k) => {
+      const b = document.createElement('button'), im = document.createElement('img');
+      im.src = treeCell(k).toDataURL(); im.alt = name; b.append(im, name);
+      b.addEventListener('click', () => {
+        if (treeTool === 'add') { treeBrush = treeBrush === k ? -1 : k; libShow(); return; }
+        if (treeSet.includes(k)) { if (treeSet.length > 1) treeSet = treeSet.filter((v) => v !== k); } else treeSet = treeSet.concat(k).sort((x, y) => x - y);
+        try { localStorage.setItem(STORE + '-treeset', JSON.stringify(treeSet)); } catch (e) { /* 只留在這一次 */ }
+        libShow(); out.value = text(); clearTimeout(wait); wait = setTimeout(build, 140);
+      });
+      lib.appendChild(b);
+    });
+    libShow();
     treeSaved();
     const hillBox = document.getElementById('set-hill');
     HILLS.forEach(([k, label]) => {
@@ -1295,8 +1358,9 @@
     ground(); buildings(); bridges(); skywalk(); streets(); nightMarket(); hills();
     const leaf = texTrees();
     const tr = treeList();
-    colorOnly.push(standees(tr.flat, 9, 14.5, 3, 2, leaf, 3.4));
-    colorOnly.push(standees(tr.hill, 9, 14.5, 3, 2, leaf, 3.4, (t) => 0.2 + t[5] * RISE));   // 山上只留一些樹
+    const kinded = (list) => list.map((t) => [t[0], t[1], t[2], treeKind(t), t[4], t[5]]);
+    colorOnly.push(standees(kinded(tr.flat), 9, 14.5, 6, 2, leaf, 3.4));
+    colorOnly.push(standees(kinded(tr.hill), 9, 14.5, 6, 2, leaf, 3.4, (t) => 0.2 + t[5] * RISE));   // 山上只留一些樹
     crowd.push(standees(D.people.map((t, i) => [t[0], t[1], t[2], (i * 5 + t[3]) % 24]), 3.45, 4.6, 8, 3, texPeople(), 0.9));
     traffic();
     roadNames(); lenses(); surveyBase();
@@ -1526,15 +1590,15 @@
     (X.roads || []).forEach((r) => ribbon(road, r.p, r.n * 1.72, 0));
     (X.bus || []).forEach((l) => ribbon(road, l, 1.9, 0));
     const hi = paint(road, mix(C.major, '#e8452c', 0.45), 0.76, { opacity: 0.95 }); if (hi) lensObj.issue.push(hi);
-    const pink = C.heroPink, L = spots.layby, sk = spots.sky, N = spots.night, warn = '#e8452c', grey = '#8a8a8a';
+    const pink = C.heroPink, L = spots.layby, sk = spots.sky, N = spots.night, warn = '#e8452c', grey = '#8a8a8a', carTex = texCars();
+    const cars = (items) => standees(items, 7.4, 4.9, 6, 1, carTex, 1.7);     // 蠟筆畫的車：一張一張立起來的紙片，永遠面向鏡頭
     if (L) {                                                                    // 事件一：接送的車停在車道上，旁邊的停靠區空著
-      const strip = [], box = [], k = kit(), c0 = L.c;                    // 車子停在緊貼路緣的那一條車道上，就在停靠區前面
+      const strip = [], box = [], c0 = L.c;                    // 車子停在緊貼路緣的那一條車道上，就在停靠區前面
       ribbon(strip, [[c0[0] - L.sx * 66, c0[1] - L.sy * 66], [c0[0] - L.sx * 16, c0[1] - L.sy * 16]], 1.7, 0);
       eventObj[0].push(paint(strip, warn, 0.82, { opacity: 0.6 }));
       ribbon(box, [[-12, -1.7], [12, -1.7], [12, 1.7], [-12, 1.7], [-12, -1.7]].map(([t, o]) => [L.c[0] + L.sx * t + L.ux * o, L.c[1] + L.sy * t + L.uy * o]), 0.22, 0, [1.4, 1]);
       eventObj[0].push(paint(box, grey, 0.82, { opacity: 0.95 }));
-      [-60, -51, -42, -33, -24].forEach((t) => { const x = c0[0] + L.sx * t, y = c0[1] + L.sy * t; if (!onRoad(x, y)) return; k.tone('#f7a868'); k.box(x, y, L.ang, 2.4, 1.05, 0.9, 1.75); k.tone('#ffe6cc'); k.box(x, y, L.ang, 1.3, 0.95, 1.75, 2.45); });
-      const g = lift(k.mesh()); scene.add(g); eventObj[0].push(g);
+      eventObj[0].push(cars([-60, -51, -42, -33, -24].map((t, n) => [c0[0] + L.sx * t, c0[1] + L.sy * t, 1, n % 2]).filter((q) => onRoad(q[0], q[1]))));
       spots.jam = [c0[0] - L.sx * 44, c0[1] - L.sy * 44];
     }
     if (sk) {                                                                   // 事件二：上下天橋只有樓梯，橋下的空間零碎
@@ -1547,7 +1611,7 @@
     if (N) {                                                                    // 事件三：夜市的巷道裡攤位、行人、汽機車混在一起
       const m = new T.Mesh(up(new T.ShapeGeometry(shapes([[N.poly]]))), new T.MeshBasicMaterial({ color: warn, transparent: true, opacity: 0.38, depthWrite: false }));
       m.position.y = 0.82; m.renderOrder = 2; scene.add(m); eventObj[2].push(m);
-      const k = kit(), xs = N.poly.map((q) => q[0]), ys = N.poly.map((q) => q[1]), put = [];
+      const xs = N.poly.map((q) => q[0]), ys = N.poly.map((q) => q[1]), put = [];
       const bx = Math.min(...xs), by = Math.min(...ys), bw = Math.max(...xs) - bx, bh = Math.max(...ys) - by;
       for (let n = 0; n < 500 && put.length < 11; n++) {                        // 隨機找位置，最多十一台
         const x = bx + rnd() * bw, y = by + rnd() * bh, pt = { x, y };
@@ -1560,17 +1624,14 @@
         }
         if (best < 3.2 || put.some((q) => Math.hypot(q[0] - x, q[1] - y) < 13)) continue;
         put.push([x, y]);
-        if (put.length % 4 !== 0) { k.tone('#f7a868'); k.box(x, y, a, 2.6, 1.15, 0.9, 1.85); k.tone('#ffe6cc'); k.box(x, y, a, 1.4, 1.05, 1.85, 2.6); }      // 汽車：四台裡有三台，顏色跟議題一的車一樣
-        else { k.tone('#f7a868'); k.box(x, y, a, 1, 0.35, 0.9, 1.6); k.tone('#ffe6cc'); k.box(x, y, a, 0.3, 0.3, 1.6, 2.3); }                             // 機車和騎士
       }
-      const g = lift(k.mesh()); scene.add(g); eventObj[2].push(g);
+      eventObj[2].push(cars(put.map((q, n) => [q[0], q[1], n % 4 === 3 ? 0.8 : 1, n % 4 === 3 ? 2 : n % 2])));   // 四台裡三台是汽車、一台是機車
     }
     if (L) {                                                                    // 一：閒置的公車停靠區改成家長臨時接送區
-      const box = [], k = kit();
+      const box = [];
       ribbon(box, [[L.c[0] - L.sx * 12, L.c[1] - L.sy * 12], [L.c[0] + L.sx * 12, L.c[1] + L.sy * 12]], 1.7, 0);
       issueObj[0].push(paint(box, pink, 0.82, { opacity: 0.8 }));
-      [-7, 0, 7].forEach((t) => { const x = L.c[0] + L.sx * t, y = L.c[1] + L.sy * t; k.tone('#ffffff'); k.box(x, y, L.ang, 2.4, 1.05, 0.9, 1.75); k.tone('#eef3f6'); k.box(x, y, L.ang, 1.3, 0.95, 1.75, 2.45); });
-      const g = lift(k.mesh()); scene.add(g); issueObj[0].push(g);
+      issueObj[0].push(cars([-7.5, 0, 7.5].map((t, n) => [L.c[0] + L.sx * t, L.c[1] + L.sy * t, 1, 3 + n])));
     }
     if (sk) {                                                                   // 二：橋下空間改善、兩端加電梯
       const under = [], k = kit(), W = sk.W, H = sk.H;
@@ -1790,7 +1851,7 @@
       const hits = ray.intersectObjects(hillOnly.filter((o) => o && o.isMesh)), pt = hits.length ? hits[0].point : ray.ray.intersectPlane(new T.Plane(new T.Vector3(0, 1, 0), 0), new T.Vector3());
       if (!pt || Math.abs(pt.x) > HW - 2 || Math.abs(pt.z) > HH - 2) return;
       if (D.buildings.some((b) => inside({ x: pt.x, y: -pt.z }, b.p))) return;      // 點到房子的位置不種（樹會被房子蓋住）
-      TREES.add.push([+pt.x.toFixed(1), +(-pt.z).toFixed(1), +(0.8 + Math.random() * 0.5).toFixed(2), Math.floor(Math.random() * 6)]);
+      TREES.add.push([+pt.x.toFixed(1), +(-pt.z).toFixed(1), +(0.8 + Math.random() * 0.5).toFixed(2), treeBrush >= 0 ? 100 + treeBrush : Math.floor(Math.random() * 6)]);
     } else {
       let best = null, bd = 30;                                                 // 在畫面上找離點擊位置最近的那棵（30 像素內）
       treeShown.flat.concat(treeShown.hill).forEach((t) => {

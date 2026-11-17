@@ -39,6 +39,7 @@ window.ATLAS_STYLE = {
     heroSky: '#2f8fe6',    // 淺藍：樓身、天橋欄杆
     heroPink: '#ec3cb4',   // 杜鵑：格子、色塊、人流與步行圈
   },
+  trees: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],   // 地圖上用圖鑑裡的哪幾種樹：0 水滴、1 同心圓、2 葉片、3 橫紋、4 圓葉、5 針葉、6 層疊、7 松、8 藍水滴、9 枯枝、10 秋色、11 淡黃
   hillPattern: 'loops',     // 山的圖案：wave 波紋、paver 斜格、loops 草圈、stripes 橫條
   weather: 'sun',          // 天氣：sun 晴、cloud 多雲、grey 陰、rain 雨
 };
