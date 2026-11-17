@@ -950,28 +950,36 @@
     stalls = null;
     const poly = (X.night || [])[0];
     if (!poly) return;
-    const k = kit(), glow = [], tones = ['#e8452c', '#f2b632', '#2f8fe6', '#3fa66b', '#f08a2c'];
-    const xs = poly.map((q) => q[0]), ys = poly.map((q) => q[1]);
+    const k = kit(), glow = [], tones = ['#c98f84', '#d8c08a', '#9db4c2', '#a9bfa3', '#d3ab88'];   // 棚子用低彩度的顏色
+    const xs = poly.map((q) => q[0]), ys = poly.map((q) => q[1]), x0 = Math.min(...xs) - 8, x1 = Math.max(...xs) + 8, y0 = Math.min(...ys) - 8, y1 = Math.max(...ys) + 8;
+    const near = D.buildings.filter((b) => b.p.some((q) => q[0] > x0 && q[0] < x1 && q[1] > y0 && q[1] < y1)), placed = [];
     let n = 0;
-    for (let x = Math.min(...xs); x < Math.max(...xs); x += 6.5) for (let y = Math.min(...ys); y < Math.max(...ys); y += 6.5) {
-      const px = x + rnd() * 2, py = y + rnd() * 2, pt = { x: px, y: py };
-      if (!inside(pt, poly) || inAny(pt, D.major) || D.buildings.some((b) => inside(pt, b.p))) continue;
-      let best = 1e9, a = 0;                                                    // 攤位順著最近的那一段街邊擺
-      for (let i = 0; i + 1 < poly.length; i++) {
-        const p0 = poly[i], p1 = poly[i + 1], dx = p1[0] - p0[0], dy = p1[1] - p0[1], t = Math.max(0, Math.min(1, ((px - p0[0]) * dx + (py - p0[1]) * dy) / (dx * dx + dy * dy || 1)));
-        const dist = Math.hypot(px - p0[0] - dx * t, py - p0[1] - dy * t);
-        if (dist < best) { best = dist; a = Math.atan2(dy, dx); }
+    near.forEach((b) => {                                                       // 攤位貼著房子的牆邊擺，路中間留給人走
+      for (let i = 0; i < b.p.length; i++) {
+        const p0 = b.p[i], p1 = b.p[(i + 1) % b.p.length], dx = p1[0] - p0[0], dy = p1[1] - p0[1], len = Math.hypot(dx, dy);
+        if (len < 3) continue;
+        const ux = dx / len, uy = dy / len, a = Math.atan2(dy, dx);
+        for (let t = 1.6 + rnd() * 1.5; t < len - 1.2; t += 4.7 + rnd() * 1.2) {
+          let hit = null;
+          [1, -1].forEach((sd) => {                                             // 牆的哪一邊是街上
+            const px = p0[0] + ux * t + uy * sd * 2.1, py = p0[1] + uy * t - ux * sd * 2.1, pt = { x: px, y: py };
+            if (!hit && inside(pt, poly) && !inAny(pt, D.major) && !near.some((o) => inside(pt, o.p))) hit = [px, py];
+          });
+          if (!hit || placed.some((q) => Math.hypot(q[0] - hit[0], q[1] - hit[1]) < 4.2)) continue;
+          placed.push(hit);
+          const px = hit[0], py = hit[1];
+          k.tone('#efe9dc'); k.box(px, py, a, 1.3, 0.8, 0.5, 1.5);
+          k.tone('#9a9287'); [[-1.5, -1], [1.5, -1], [1.5, 1], [-1.5, 1]].forEach(([e, o]) => k.box(px + Math.cos(a) * e - Math.sin(a) * o, py + Math.sin(a) * e + Math.cos(a) * o, a, 0.06, 0.06, 0.5, 2.6));
+          k.tone(tones[n++ % tones.length]); k.box(px, py, a, 1.75, 1.2, 2.6, 2.85);
+          k.tone('#f6ecc0'); k.box(px, py, a, 0.26, 0.26, 2.25, 2.6);
+          for (let j = 0; j < 14; j++) { const a0 = (j / 14) * Math.PI * 2, a1 = ((j + 1) / 14) * Math.PI * 2; glow.push(px, 0, -py, px + Math.cos(a0) * 3.6, 0, -py + Math.sin(a0) * 3.6, px + Math.cos(a1) * 3.6, 0, -py + Math.sin(a1) * 3.6); }
+        }
       }
-      k.tone('#f4efe4'); k.box(px, py, a, 1.3, 0.8, 0.5, 1.5);
-      k.tone('#8d8478'); [[-1.5, -1], [1.5, -1], [1.5, 1], [-1.5, 1]].forEach(([e, o]) => k.box(px + Math.cos(a) * e - Math.sin(a) * o, py + Math.sin(a) * e + Math.cos(a) * o, a, 0.06, 0.06, 0.5, 2.6));
-      k.tone(tones[n++ % tones.length]); k.box(px, py, a, 1.75, 1.2, 2.6, 2.85);
-      k.tone('#fff0a0'); k.box(px, py, a, 0.28, 0.28, 2.25, 2.6);
-      for (let i = 0; i < 14; i++) { const a0 = (i / 14) * Math.PI * 2, a1 = ((i + 1) / 14) * Math.PI * 2; glow.push(px, 0, -py, px + Math.cos(a0) * 4.2, 0, -py + Math.sin(a0) * 4.2, px + Math.cos(a1) * 4.2, 0, -py + Math.sin(a1) * 4.2); }
-    }
+    });
     stalls = k.mesh();
     stalls.children[0].material = new T.MeshBasicMaterial({ vertexColors: true, side: T.DoubleSide });   // 不吃光：晚上棚子和燈還是亮的
     stalls.children[0].castShadow = false;
-    const g = paint(glow, '#ffd66b', 0.62, { opacity: 0.3 });
+    const g = paint(glow, '#ffe2a0', 0.62, { opacity: 0.2 });
     if (g) { scene.remove(g); stalls.add(g); }
     scene.add(stalls);
     spots.night = { poly, c: [xs.reduce((s, v) => s + v, 0) / xs.length, ys.reduce((s, v) => s + v, 0) / ys.length], count: n };
