@@ -1548,8 +1548,9 @@
       const m = new T.Mesh(up(new T.ShapeGeometry(shapes([[N.poly]]))), new T.MeshBasicMaterial({ color: warn, transparent: true, opacity: 0.38, depthWrite: false }));
       m.position.y = 0.82; m.renderOrder = 2; scene.add(m); eventObj[2].push(m);
       const k = kit(), xs = N.poly.map((q) => q[0]), ys = N.poly.map((q) => q[1]), put = [];
-      for (let x = Math.min(...xs) + 2; x < Math.max(...xs); x += 4) for (let y = Math.min(...ys) + 2; y < Math.max(...ys); y += 4) {
-        const pt = { x, y };
+      const bx = Math.min(...xs), by = Math.min(...ys), bw = Math.max(...xs) - bx, bh = Math.max(...ys) - by;
+      for (let n = 0; n < 500 && put.length < 11; n++) {                        // 隨機找位置，最多十一台
+        const x = bx + rnd() * bw, y = by + rnd() * bh, pt = { x, y };
         if (!inside(pt, N.poly) || D.buildings.some((b) => inside(pt, b.p))) continue;
         let best = 1e9, a = 0;                                                  // 離街邊最近的那一段：車頭順著它，而且只放在街的中間
         for (let i = 0; i + 1 < N.poly.length; i++) {
@@ -1557,10 +1558,10 @@
           const dist = Math.hypot(x - p0[0] - dx * t, y - p0[1] - dy * t);
           if (dist < best) { best = dist; a = Math.atan2(dy, dx); }
         }
-        if (best < 3.4 || put.some((q) => Math.hypot(q[0] - x, q[1] - y) < 10)) continue;
+        if (best < 3.2 || put.some((q) => Math.hypot(q[0] - x, q[1] - y) < 13)) continue;
         put.push([x, y]);
-        if (put.length % 4 !== 0) { k.tone('#ffffff'); k.box(x, y, a, 2.9, 1.3, 0.9, 2); k.tone('#c8261a'); k.box(x, y, a, 1.6, 1.15, 2, 2.85); }         // 汽車：四台裡有三台，白車身、紅車頂，比較大
-        else { k.tone('#f08a4a'); k.box(x, y, a, 1, 0.35, 0.9, 1.6); k.tone('#ffd9b8'); k.box(x, y, a, 0.3, 0.3, 1.6, 2.3); }                             // 機車和騎士
+        if (put.length % 4 !== 0) { k.tone('#f7a868'); k.box(x, y, a, 2.6, 1.15, 0.9, 1.85); k.tone('#ffe6cc'); k.box(x, y, a, 1.4, 1.05, 1.85, 2.6); }      // 汽車：四台裡有三台，顏色跟議題一的車一樣
+        else { k.tone('#f7a868'); k.box(x, y, a, 1, 0.35, 0.9, 1.6); k.tone('#ffe6cc'); k.box(x, y, a, 0.3, 0.3, 1.6, 2.3); }                             // 機車和騎士
       }
       const g = lift(k.mesh()); scene.add(g); eventObj[2].push(g);
     }
