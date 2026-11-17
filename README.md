@@ -21,6 +21,17 @@
 
 樓層的名稱和介紹文字在 `data/site.js` 的 `floors`，頁面上的資料來源在同一個檔案的 `sources`。
 
+## 一鍵發布
+
+對資料夾裡的「編輯地圖.command」按兩下，瀏覽器會打開 `http://localhost:8138`（只有這台電腦連得到）。
+調好顏色、種好樹、放好人之後，按「編輯」面板最上面的「發布到網站」：它會把顏色寫進 `data/style.js`、樹和人寫進 `data/trees.js`，commit 並 push 到 GitHub。
+
+第一次要讓這台電腦記住 GitHub 的登入資訊（只要做一次）：
+
+1. 在 GitHub 網站 Settings → Developer settings → Personal access tokens 建一個 token，權限勾 `repo`。
+2. 打開「終端機」，執行 `cd ~/Desktop/shuiyuan-atlas && git push`，Username 填 GitHub 帳號，Password 貼上 token。
+3. 之後「發布到網站」就會直接上傳。沒做這一步的話，按鈕還是會存檔並 commit，只是最後要到 GitHub Desktop 按一次「Push origin」。
+
 ## 檔案
 
 - `data/atlas.js`：地形、建築、橋、樹、路網（由 `tools/build-atlas.py` 從 OpenStreetMap 產生）

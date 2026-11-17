@@ -3,7 +3,7 @@
 
 用法：對專案資料夾裡的「編輯地圖.command」按兩下（或執行 python3 tools/edit-server.py）。
 它做兩件事：
-  1. 在 http://localhost:8141 打開地圖（只有這台電腦連得到）。
+  1. 在 http://localhost:8138 打開地圖（只有這台電腦連得到）。
   2. 編輯面板按「發布到網站」時，把顏色寫進 data/style.js、樹和人寫進 data/trees.js，
      然後 git commit 並 push 到 GitHub。push 需要這台電腦已經存過 GitHub 的登入資訊（見 README）。
 """
@@ -11,7 +11,7 @@ import json, os, subprocess, sys, webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PORT = 8141
+PORT = 8138
 FILES = {"style": ("data/style.js", "window.ATLAS_STYLE"), "trees": ("data/trees.js", "window.ATLAS_TREES")}
 
 
@@ -79,8 +79,14 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    srv = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     url = "http://localhost:%d/" % PORT
+    try:
+        srv = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
+    except OSError:                                                # 已經有一個在跑了：直接打開它
+        print("編輯用的地圖已經開著：" + url)
+        if "--no-open" not in sys.argv:
+            webbrowser.open(url)
+        sys.exit(0)
     print("地圖編輯中：" + url + "\n關掉這個視窗就結束。")
     if "--no-open" not in sys.argv:
         webbrowser.open(url)
