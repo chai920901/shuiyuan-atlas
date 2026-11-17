@@ -34,9 +34,9 @@
   // 樹：地圖資料自動種的，加上手動加的（add），扣掉手動移掉的（cut）。發布的版本讀 data/trees.js；自己電腦上編輯時先存在瀏覽器裡
   const TREES = { add: ((window.ATLAS_TREES || {}).add || []).slice(), cut: ((window.ATLAS_TREES || {}).cut || []).slice() };
   if (EDIT) { try { const v = JSON.parse(localStorage.getItem(STORE + '-trees') || 'null'); if (v) { TREES.add = v.add || []; TREES.cut = v.cut || []; } } catch (e) { /* 用檔案裡的 */ } }
-  let treeSet = (STYLE.trees || []).filter((k) => k >= 0 && k < 12), treeBrush = -1;   // treeSet：地圖上用哪幾種樹；treeBrush：種樹時指定種哪一種（-1 是隨機）
+  let treeSet = (STYLE.trees || []).filter((k) => k >= 0 && k < 18), treeBrush = -1;   // treeSet：地圖上用哪幾種樹；treeBrush：種樹時指定種哪一種（-1 是隨機）
   if (EDIT) { try { const v = JSON.parse(localStorage.getItem(STORE + '-treeset') || 'null'); if (v && v.length) treeSet = v; } catch (e) { /* 用檔案裡的 */ } }
-  if (!treeSet.length) treeSet = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+  if (!treeSet.length) treeSet = [12, 13, 14, 15, 16, 17];                       // 沒設定就用最早的六色點描水滴
   // 一片一種：同一座山是同一種樹，大馬路的行道樹是一種、街道的行道樹是另一種，每塊草地各一種，其餘零星的樹依所在的街區分
   const treeZone = (t) => {
     if (t[4]) { const i = D.wood.findIndex((r) => inside({ x: t[0], y: t[1] }, r[0])); return 40 + (i < 0 ? 0 : i) * 5; }
@@ -220,7 +220,11 @@
   }
 
   // ---------- 樹的圖鑑：十二種水彩畫的樹，排成 6 × 2。地圖上用哪幾種由 treeSet 決定 ----------
-  const TREE_NAMES = ['水滴', '同心圓', '葉片', '橫紋', '圓葉', '針葉', '層疊', '松', '藍水滴', '枯枝', '秋色', '淡黃'];
+  const TREE_NAMES = ['水滴', '同心圓', '葉片', '橫紋', '圓葉', '針葉', '層疊', '松', '藍水滴', '枯枝', '秋色', '淡黃', '點描 黃綠', '點描 綠', '點描 青綠', '點描 藍', '點描 淡黃', '點描 深青'];
+  // 最早的那一款：水滴形樹冠、點描、白色枝條，六種顏色（圖鑑的 12–17）
+  const TREE_FILL = ['#c6bd55', '#9fbf7a', '#6fae9c', '#86aecb', '#d7cf74', '#4f978b'];
+  const TREE_DOT = ['#e3dc8c', '#c9dba5', '#a7d2c4', '#b9d3e6', '#f0ebb0', '#86c0b3'];
+  const TREE_SPECK = ['#b0577a', '#557f4a', '#3f7f76', '#c25f86', '#a39a3c', '#2f6f69'];
   const TW = 160, TH = 256;
   function treeCell(kind) {
     return sheet(TW, TH, (g) => {
@@ -230,6 +234,19 @@
       const line = (col, wd, ...pts) => { g.strokeStyle = col; g.lineWidth = wd; g.beginPath(); pts.forEach((q, i) => (i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]))); g.stroke(); };
       const inside = (path, draw) => { g.save(); path(); g.clip(); draw(); g.restore(); };
       const drop = (top, bot, r) => { g.beginPath(); g.moveTo(cx, top); g.bezierCurveTo(cx + r * 0.42, top + (bot - top) * 0.34, cx + r, bot - r * 1.5, cx + r, bot - r); g.arc(cx, bot - r, r, 0, Math.PI); g.bezierCurveTo(cx - r, bot - r * 1.5, cx - r * 0.42, top + (bot - top) * 0.34, cx, top); g.closePath(); };
+      if (kind >= 12) {                                                         // 點描水滴：不疊水彩，保持原本乾淨的點
+        const v = kind - 12, r = TW * 0.4, bot = TH - 44;
+        drop(10, bot, r); g.fillStyle = TREE_FILL[v]; g.fill();
+        inside(() => drop(10, bot, r), () => {
+          for (let i = 0; i < 420; i++) { const k = rnd(); g.fillStyle = k < 0.6 ? TREE_DOT[v] : k < 0.86 ? TREE_SPECK[v] : '#ffffff'; g.globalAlpha = 0.55 + rnd() * 0.45; g.fillRect(rnd() * TW, rnd() * TH, 2 + rnd() * 3, 2 + rnd() * 3); }
+        });
+        g.globalAlpha = 1; line('#fbfaf2', 5, [cx, TH - 4], [cx, 62]);
+        for (let i = 0; i < 4; i++) {
+          const y = bot - r * 0.5 - i * 34, len = r * 0.78 * (1 - i * 0.17), sd = i % 2 ? 1 : -1;
+          line('#fbfaf2', 3.4, [cx, y], [cx + sd * len, y - len * 0.9]); line('#fbfaf2', 2.4, [cx + sd * len * 0.5, y - len * 0.45], [cx + sd * len * 0.5, y - len * 0.95]); line('#fbfaf2', 3, [cx, y + 14], [cx - sd * len * 0.7, y + 14 - len * 0.62]);
+        }
+        return;
+      }
       const waves = (col, wd, y0, y1, gap, amp) => { g.strokeStyle = col; g.lineWidth = wd; for (let y = y0; y < y1; y += gap) { g.beginPath(); for (let x = 0; x <= TW; x += 6) g.lineTo(x, y + Math.sin(x / 11 + y) * amp); g.stroke(); } };
       [
         () => { drop(10, G - 40, 62); g.fillStyle = '#9fbf7a'; g.fill(); line('#fbfaf2', 5, [cx, G], [cx, 62]); [0, 1, 2, 3].forEach((i) => { const y = G - 74 - i * 34, l = 46 * (1 - i * 0.17), sd = i % 2 ? 1 : -1; line('#fbfaf2', 3.4, [cx, y], [cx + sd * l, y - l * 0.9]); line('#fbfaf2', 3, [cx, y + 14], [cx - sd * l * 0.7, y + 14 - l * 0.62]); }); },
@@ -249,7 +266,7 @@
     });
   }
   function texTrees() {
-    const t = new T.CanvasTexture(sheet(TW * 6, TH * 2, (g) => { for (let k = 0; k < 12; k++) g.drawImage(treeCell(k), (k % 6) * TW, Math.floor(k / 6) * TH); }));
+    const t = new T.CanvasTexture(sheet(TW * 6, TH * 3, (g) => { for (let k = 0; k < 18; k++) g.drawImage(treeCell(k), (k % 6) * TW, Math.floor(k / 6) * TH); }));
     t.anisotropy = 4;
     return t;
   }
@@ -1438,8 +1455,8 @@
     const leaf = texTrees();
     const tr = treeList();
     const kinded = (list) => list.map((t) => [t[0], t[1], t[2], treeKind(t), t[4], t[5]]);
-    colorOnly.push(standees(kinded(tr.flat), 9, 14.5, 6, 2, leaf, 3.4));
-    colorOnly.push(standees(kinded(tr.hill), 9, 14.5, 6, 2, leaf, 3.4, (t) => 0.2 + t[5] * RISE));   // 山上只留一些樹
+    colorOnly.push(standees(kinded(tr.flat), 9, 14.5, 6, 3, leaf, 3.4));
+    colorOnly.push(standees(kinded(tr.hill), 9, 14.5, 6, 3, leaf, 3.4, (t) => 0.2 + t[5] * RISE));   // 山上只留一些樹
     crowd.push(standees(D.people.map((t, i) => [t[0], t[1], t[2], (i * 5 + t[3]) % 24]), 3.45, 4.6, 8, 3, texPeople(), 0.9));
     traffic();
     roadNames(); lenses(); surveyBase();
