@@ -1545,7 +1545,7 @@
       eventObj[1].push(paint(under, grey, 0.82, { opacity: 0.4 }));
     }
     if (N) {                                                                    // 事件三：夜市的巷道裡攤位、行人、汽機車混在一起
-      const m = new T.Mesh(up(new T.ShapeGeometry(shapes([[N.poly]]))), new T.MeshBasicMaterial({ color: warn, transparent: true, opacity: 0.5, depthWrite: false }));
+      const m = new T.Mesh(up(new T.ShapeGeometry(shapes([[N.poly]]))), new T.MeshBasicMaterial({ color: warn, transparent: true, opacity: 0.38, depthWrite: false }));
       m.position.y = 0.82; m.renderOrder = 2; scene.add(m); eventObj[2].push(m);
       const k = kit(), xs = N.poly.map((q) => q[0]), ys = N.poly.map((q) => q[1]), put = [];
       for (let x = Math.min(...xs) + 2; x < Math.max(...xs); x += 4) for (let y = Math.min(...ys) + 2; y < Math.max(...ys); y += 4) {
@@ -1557,9 +1557,9 @@
           const dist = Math.hypot(x - p0[0] - dx * t, y - p0[1] - dy * t);
           if (dist < best) { best = dist; a = Math.atan2(dy, dx); }
         }
-        if (best < 3.4 || put.some((q) => Math.hypot(q[0] - x, q[1] - y) < 9)) continue;
+        if (best < 3.4 || put.some((q) => Math.hypot(q[0] - x, q[1] - y) < 10)) continue;
         put.push([x, y]);
-        if (put.length % 3 === 0) { k.tone('#f7a868'); k.box(x, y, a, 2.3, 1, 0.9, 1.7); k.tone('#ffe6cc'); k.box(x, y, a, 1.2, 0.9, 1.7, 2.35); }      // 汽車
+        if (put.length % 4 !== 0) { k.tone('#ffffff'); k.box(x, y, a, 2.9, 1.3, 0.9, 2); k.tone('#c8261a'); k.box(x, y, a, 1.6, 1.15, 2, 2.85); }         // 汽車：四台裡有三台，白車身、紅車頂，比較大
         else { k.tone('#f08a4a'); k.box(x, y, a, 1, 0.35, 0.9, 1.6); k.tone('#ffd9b8'); k.box(x, y, a, 0.3, 0.3, 1.6, 2.3); }                             // 機車和騎士
       }
       const g = lift(k.mesh()); scene.add(g); eventObj[2].push(g);
