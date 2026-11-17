@@ -10,10 +10,10 @@
     wood: '#3f6c49', lawn: '#d3dfae', lawnLine: '#4f8e58',
     major: '#c4776b', minor: '#d79c8f', lane: '#e6c4b5', foot: '#f9f3e6',
     wall: '#f3e8cb', deck: '#b9655a', pier: '#d8ccb2', key: '#d93a1e', key2: '#e9b44c',
-    heroBlue: '#1a44c8', heroSky: '#2f8fe6', heroPink: '#d81b72', tint: '#d81b72', busLane: '#38c6b8',
+    heroBlue: '#1a44c8', heroSky: '#2f8fe6', heroPink: '#d81b72', tint: '#d81b72', busLane: '#38c6b8', zebra: '#fffdf6',
   };
   const PALETTE = [['paper', '紙底'], ['ink', '墨線'], ['sea', '水面'], ['wave', '水紋'], ['hill', '山　底色'], ['wood', '山　圖案線條'], ['lawn', '草地'], ['lawnLine', '草地條紋'],
-    ['major', '大馬路'], ['minor', '街道'], ['lane', '巷道'], ['foot', '步道'], ['wall', '建築'], ['tint', '市場周邊的房子'], ['deck', '高架橋'], ['busLane', '公車專用道'], ['key2', '地標／天橋'],
+    ['major', '大馬路'], ['minor', '街道'], ['lane', '巷道'], ['foot', '步道'], ['wall', '建築'], ['tint', '市場周邊的房子'], ['deck', '高架橋'], ['busLane', '公車專用道'], ['zebra', '斑馬線'], ['key2', '地標／天橋'],
     ['heroBlue', '市場　深藍'], ['heroSky', '市場　淺藍'], ['heroPink', '市場　杜鵑']];
   const STORE = 'atlas-palette-' + S.id;
   // data/style.js 裡可以覆蓋預設的顏色、時間、天氣
@@ -1063,7 +1063,7 @@
     }
     paint(lane, C.busLane, 0.455);
     paint(white, '#fffdf6', 0.47);
-    paint(zebra, '#fffdf6', 0.48);
+    paint(zebra, C.zebra, 0.48);
   }
   // 公館夜市的攤位：推車加上彩色的棚子和一盞燈，傍晚五點半以後才出來
   function nightMarket() {
