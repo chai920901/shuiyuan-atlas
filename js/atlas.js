@@ -31,6 +31,8 @@
   let hillKind = STYLE.hillPattern || 'wave';
   if (EDIT) { try { hillKind = localStorage.getItem(STORE + '-hill') || hillKind; } catch (e) { /* 用檔案裡的 */ } }
   if (!HILLS.some((h) => h[0] === hillKind)) hillKind = 'wave';
+  let wc = STYLE.watercolor !== false;                                           // 水彩濾鏡：畫面邊緣微微暈開，疊一層紙的斑駁
+  if (EDIT) { try { const v = localStorage.getItem(STORE + '-wc'); if (v) wc = v === '1'; } catch (e) { /* 用檔案裡的 */ } }
   function derive() {                                                           // 由主色推出深淺變化
     C.woodDark = mix(C.wood, '#000000', 0.28); C.woodLight = mix(C.wood, '#ffffff', 0.25);
     C.walls = [C.wall, mix(C.wall, '#000000', 0.04), mix(C.wall, '#ffffff', 0.4), mix(C.wall, '#000000', 0.09)];
@@ -203,11 +205,11 @@
   }
 
   // ---------- 模式用的登記簿 ----------
-  const fills = [], inks = [], solidOnly = [], heightOnly = [], roofOnly = [], crowd = [], colorOnly = [];
-  const lensObj = { walk: [], car: [], height: [], reach: [] };
+  const fills = [], inks = [], solidOnly = [], heightOnly = [], roofOnly = [], crowd = [], colorOnly = [], paleOnly = [], hillOnly = [], issueObj = [[], [], []];
+  const lensObj = { walk: [], car: [], shop: [], art: [], issue: [], height: [], reach: [] };
   const fill = (m) => { m.polygonOffset = true; m.polygonOffsetFactor = 1; m.polygonOffsetUnits = 1; fills.push(m); return m; };   // 有顏色的面
   const ink = (opacity) => { const m = new T.LineBasicMaterial({ color: C.ink, transparent: true, opacity }); m.userData.base = opacity; inks.push(m); return m; };
-  let mode = 'a', lens = 'map', bare = false;                                  // lens：分析模式
+  let mode = 'a', lens = 'map', bare = false, issueAt = 0;                                  // lens：分析模式
   const blobs = [];
 
   // ---------- 地面的各層 ----------
@@ -269,8 +271,8 @@
       const wall = fill(new T.MeshLambertMaterial({ color: side }));              // 側面不貼圖案，只用一個素色，免得圖案被拉扯
       const m = new T.Mesh(up(g), [mat, wall]);
       m.position.y = 0.2 + i * RISE; m.castShadow = m.receiveShadow = true;
-      scene.add(m);
-      outline(level, 0.25 + (i + 1) * RISE, 0.6);
+      scene.add(m); hillOnly.push(m);
+      hillOnly.push(outline(level, 0.25 + (i + 1) * RISE, 0.6));
     });
   }
 
@@ -412,13 +414,15 @@
     const heroLines = new T.LineSegments(hg, ink(0.8)); heroLines.renderOrder = 3;
     heroSrc = [main, heroLines];
     [solid, main, tall].forEach((m) => { m.castShadow = m.receiveShadow = true; });
-    solidOnly.push(solid); heightOnly.push(tall);
+    const faded = new T.Mesh(mass((b) => !b.hero, true), fill(new T.MeshLambertMaterial({ color: '#ffffff', emissive: '#8f8f8f', side: T.DoubleSide })));   // 議題：周邊全部淡成白色（自己帶一點亮度，背光的牆才不會變成深灰）
+    faded.castShadow = faded.receiveShadow = true;
+    solidOnly.push(solid); heightOnly.push(tall); paleOnly.push(faded);
     edge.length = 0;                                                            // 基地模不描框線，只有主體留著稜線
     const eg = new T.BufferGeometry();
     eg.setAttribute('position', new T.Float32BufferAttribute(edge, 3));
     const lines = new T.LineSegments(eg, ink(0.8));
     lines.renderOrder = 3;
-    town = new T.Group(); town.add(solid, tall, lines); scene.add(town);
+    town = new T.Group(); town.add(solid, tall, faded, lines); scene.add(town);
     heroRing = D.buildings.find((b) => b.hero).p;
     roofs();
   }
@@ -468,6 +472,13 @@
           face([[x, y1, -y], [p[0], y1, p[1]], [q[0], y1, q[1]]], mid);
           line([p[0], y1, p[1]], [q[0], y1, q[1]]);
         });
+      },
+      slope(x0, y0, z0, x1, y1, z1, hw, th) {                                   // 斜板：從 (x0, y0) 高 z0 斜到 (x1, y1) 高 z1
+        const dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy) || 1, px = (-dy / len) * hw, py = (dx / len) * hw;
+        const lo = [[x0 - px, z0, -(y0 - py)], [x0 + px, z0, -(y0 + py)], [x1 + px, z1, -(y1 + py)], [x1 - px, z1, -(y1 - py)]], hi = lo.map((q) => [q[0], q[1] + th, q[2]]);
+        const mid = [(x0 + x1) / 2, (z0 + z1) / 2 + th / 2, -(y0 + y1) / 2];
+        face(hi, mid); face(lo, mid);
+        for (let i = 0; i < 4; i++) { const j = (i + 1) % 4; face([lo[i], lo[j], hi[j], hi[i]], mid); line(hi[i], hi[j]); }
       },
       mesh() {
         const g = new T.BufferGeometry();
@@ -565,6 +576,14 @@
       const m = new T.Mesh(up(new T.ShapeGeometry(plate)), fill(new T.MeshLambertMaterial({ color: tones[f.kind] || tones.office })));
       m.position.y = f.from + 0.08; m.receiveShadow = true; plates.push(m);
       if (f.kind === 'market') {
+        if (n === 0) {                                                          // 一樓中央的電扶梯：兩道並排，黑色踏階、玻璃扶手，通往二樓
+          const top = f.to - 0.15;
+          [-0.9, 0.9].forEach((o) => {
+            const a0 = at(o, -5.5), a1 = at(o, 5.5);
+            k.tone('#30343b'); k.slope(a0[0], a0[1], f.from + 0.15, a1[0], a1[1], top, 0.55, 0.3);
+            [-0.62, 0.62].forEach((e) => { const b0 = at(o + e, -5.5), b1 = at(o + e, 5.5); k.tone('#bfe3ef'); k.slope(b0[0], b0[1], f.from + 0.45, b1[0], b1[1], top + 0.3, 0.05, 0.95); });
+          });
+        }
         let i = n;
         for (let u = -22; u <= 22; u += 4.6) for (let v = -22; v <= 22; v += 4.6) {
           if (!ok(u, v, 1.5, 1.5) || (Math.abs(u) < 2 && Math.abs(v) < 6)) continue;      // 中間留一條走道
@@ -597,30 +616,33 @@
     const k = kit(), H = second ? second.from : 5, a = heroRing && nearRing(p[0], heroRing) < nearRing(p[p.length - 1], heroRing) ? p[0] : p[p.length - 1], b = a === p[0] ? p[p.length - 1] : p[0];
     const len = Math.hypot(b[0] - a[0], b[1] - a[1]), ux = (b[0] - a[0]) / len, uy = (b[1] - a[1]) / len, ang = Math.atan2(uy, ux), W = 1.8;
     const at = (s, o) => [a[0] + ux * s - uy * o, a[1] + uy * s + ux * o];
-    const rail = C.heroSky, deck = '#e8eef5';
+    const rail = '#f4f8fc', deck = '#e8eef5', blue = '#4f86c6';                      // 白色欄杆、藍色的橋墩與橋身側邊
     let q = at(len / 2, 0);
     k.tone(deck); k.box(q[0], q[1], ang, len / 2, W, H - 0.45, H);                                   // 橋面
     [-1, 1].forEach((side) => {                                                                      // 欄杆：上下兩道橫桿加立柱
       q = at(len / 2, side * (W - 0.08));
       k.tone(rail); k.box(q[0], q[1], ang, len / 2, 0.07, H + 1.0, H + 1.15); k.box(q[0], q[1], ang, len / 2, 0.05, H + 0.5, H + 0.58);
       k.tone('#f4f8fc'); for (let s = 0.4; s < len; s += 2.2) { const t = at(s, side * (W - 0.08)); k.box(t[0], t[1], ang, 0.06, 0.06, H, H + 1.0); }
+      k.tone('#cfe6f2'); k.box(q[0], q[1], ang, len / 2, 0.025, H + 0.08, H + 0.5);                 // 玻璃護欄
+      q = at(len / 2, side * (W + 0.03)); k.tone(blue); k.box(q[0], q[1], ang, len / 2, 0.04, H - 0.5, H);
     });
-    k.tone(C.pier); for (let s = 7; s < len - 2; s += 9) { q = at(s, 0); k.box(q[0], q[1], ang, 0.45, 0.45, 0, H - 0.45); k.box(q[0], q[1], ang, 0.7, W * 0.8, H - 0.9, H - 0.45); }
+    k.tone(blue); [3.2, len / 2, len - 3.2].forEach((s) => { [-0.9, 0.9].forEach((o) => { q = at(s, o); k.box(q[0], q[1], ang, 0.5, 0.5, 0, H - 0.9); }); q = at(s, 0); k.box(q[0], q[1], ang, 0.75, W * 0.9, H - 0.9, H - 0.45); });   // 兩根一組的藍色橋墩
     k.tone('#14275e'); q = at(-0.2, 0); k.box(q[0], q[1], ang, 0.25, W, H, H + 2.8);                 // 接進二樓的門口
-    // 樓梯：一階一階往下，中間一個平台轉向。start 是橋上的起點，dir 是往下走的方向（1 或 -1，沿著跟橋垂直的方向）
+    // 樓梯：沿著人行道直直往下，中間一個平台。s 是橋上的起點，dir 是往下走的方向（1 或 -1，跟橋垂直）
     const stairs = (s, dir) => {
-      const steps = 16, rise = H / steps, run = 0.55, half = steps / 2;
+      const steps = 18, rise = H / steps, run = 0.62;
       q = at(s, dir * (W + 1.3)); k.tone(deck); k.box(q[0], q[1], ang, 1.3, 1.3, H - 0.3, H);       // 橋邊的平台
       for (let i = 0; i < steps; i++) {
-        const top = H - (i + 1) * rise, first = i < half, o = dir * (W + 2.6 + (first ? i : steps - 1 - i) * run + run / 2), back = first ? 0 : 2.8;
-        q = at(s + back, o);
-        k.tone(i % 2 ? '#dfe6ee' : deck); k.box(q[0], q[1], ang, 1.3, run / 2, Math.max(0, top - 0.5), top);
+        const top = H - (i + 1) * rise, o = dir * (W + 2.6 + i * run + (i >= steps / 2 ? 1.6 : 0) + run / 2);
+        q = at(s, o);
+        k.tone(i % 2 ? '#dfe6ee' : deck); k.box(q[0], q[1], ang, 1.3, run / 2, Math.max(0, top - 0.45), top);
+        if (i % 3 === 0) { k.tone(rail); [-1.25, 1.25].forEach((e) => { const r = at(s + e, o); k.box(r[0], r[1], ang, 0.05, 0.05, top, top + 1.05); }); }
       }
-      q = at(s + 1.4, dir * (W + 2.6 + half * run + 1.3)); k.tone(deck); k.box(q[0], q[1], ang, 2.7, 1.3, H / 2 - 0.3, H / 2);   // 轉向的平台
-      k.tone(C.pier); k.box(q[0], q[1], ang, 0.3, 0.3, 0, H / 2 - 0.3);
-      k.tone(rail); [[s - 1.3, 0], [s + 4.1, 2.8]].forEach(([e]) => { const r = at(e, dir * (W + 2.6 + half * run / 2)); k.box(r[0], r[1], ang, 0.05, half * run / 2, H * 0.75 + 0.9, H * 0.75 + 1.0); });
+      q = at(s, dir * (W + 2.6 + (steps / 2) * run + 0.8)); k.tone(deck); k.box(q[0], q[1], ang, 1.3, 0.8, H / 2 - 0.3, H / 2);   // 中間的平台
+      k.tone(blue); k.box(q[0], q[1], ang, 0.35, 0.35, 0, H / 2 - 0.3);
     };
-    stairs(len - 1.5, 1); stairs(len - 1.5, -1); stairs(6.5, -1);                                    // 對街兩座，市場門口一座
+    stairs(len - 1.5, -1); stairs(6.5, -1); stairs(6.5, 1);                                          // 對街一座，市場門口往兩邊各一座
+    spots.sky = { at, len, W, H, ang };
     skyHolder = k.mesh();
     town.add(skyHolder);
   }
@@ -743,50 +765,197 @@
     grp.add(m); scene.add(grp); growers.push(mat);
     return grp;
   }
-  // 小人：深色剪影，八種正在做事的姿勢（走路、提菜、講電話、騎車、推菜籃車、撐傘、牽小孩、遛狗），排成 4 × 2
+  // 小人：水彩筆觸的剪影。八種正在做事的姿勢（走路、提菜、講電話、騎車、推菜籃車、撐傘、牽小孩、遛狗）× 三排顏色，共 24 種
+  const PEOPLE_HUE = ['#7d4a3a', '#b06a2c', '#6f6a66', '#8c3b3f', '#8a7a35', '#5d4b70', '#a3543a', '#4f6150', '#c08a4a', '#93505c', '#3f4a5a', '#9a6b4f', '#b5503c', '#6b5a48', '#77803f', '#a56a7a', '#4a5f6e', '#c79a5a', '#8a4f33', '#5a4a44', '#9c7b3a', '#7a3f4f', '#55664f', '#b9794e'];
   function texPeople() {
-    const CW = 96, CH = 128, dark = mix(C.ink, '#26262b', 0.72);
-    const t = new T.CanvasTexture(sheet(CW * 4, CH * 2, (g) => {
-      g.fillStyle = g.strokeStyle = dark; g.lineCap = g.lineJoin = 'round';
-      const L = (wd, ...pts) => { g.lineWidth = wd; g.beginPath(); pts.forEach((q, i) => (i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]))); g.stroke(); };
-      const dot = (x, y, r) => { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); };
+    const CW = 96, CH = 128;
+    const figure = (g, i) => {
+      g.fillStyle = g.strokeStyle = '#000'; g.lineCap = g.lineJoin = 'round';
+      const L = (wd, ...pts) => { g.lineWidth = wd * 1.28; g.beginPath(); pts.forEach((q, n) => (n ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]))); g.stroke(); };
+      const dot = (x, y, r) => { g.beginPath(); g.arc(x, y, r * 1.08, 0, Math.PI * 2); g.fill(); };
       const walker = (d, arms) => {                                             // 跨步走的人；d 是左右位移
-        dot(50 + d, 15, 8.5); L(13, [49 + d, 33], [47 + d, 66]);
+        dot(50 + d, 15, 8.5); L(15, [49 + d, 33], [47 + d, 66]);
         L(8, [47 + d, 66], [56 + d, 94], [60 + d, 121]); L(8, [47 + d, 66], [38 + d, 94], [28 + d, 119]);
         L(6, [60 + d, 122], [67 + d, 122]); L(6, [28 + d, 120], [35 + d, 123]);
         if (arms) { L(6, [49 + d, 35], [40 + d, 52], [34 + d, 64]); L(6, [49 + d, 35], [57 + d, 52], [63 + d, 62]); }
       };
-      const stand = (d, top) => { dot(48 + d, top, 8.5); L(13, [48 + d, top + 18], [48 + d, top + 52]); L(8, [48 + d, top + 52], [44 + d, 122]); L(8, [48 + d, top + 52], [53 + d, 122]); };
-      const POSE = [
+      const stand = (d, top) => { dot(48 + d, top, 8.5); L(15, [48 + d, top + 18], [48 + d, top + 52]); L(8, [48 + d, top + 52], [44 + d, 122]); L(8, [48 + d, top + 52], [53 + d, 122]); };
+      [
         () => walker(0, true),
-        () => { walker(0, true); g.fillRect(26, 64, 14, 18); g.fillRect(57, 62, 13, 17); },                                   // 兩手提菜
+        () => { walker(0, true); g.fillRect(24, 64, 16, 19); g.fillRect(56, 62, 15, 18); },                                   // 兩手提菜
         () => { stand(0, 15); L(6, [48, 35], [60, 48], [55, 24]); L(6, [48, 35], [40, 54], [41, 70]); },                      // 講電話
         () => {                                                                                                               // 騎腳踏車
-          g.lineWidth = 3.4; [22, 74].forEach((x) => { g.beginPath(); g.arc(x, 105, 16, 0, Math.PI * 2); g.stroke(); });
-          L(3.4, [22, 105], [40, 84], [62, 84], [74, 105]); L(3.4, [40, 84], [48, 105], [62, 84]); L(3.4, [40, 84], [38, 74]); L(3.4, [62, 84], [64, 70], [71, 68]);
-          dot(61, 29, 8.5); L(12, [38, 70], [54, 45]); L(5.5, [54, 47], [62, 60], [69, 68]); L(7, [38, 70], [53, 87], [48, 104]); L(7, [38, 70], [46, 86], [40, 98]);
+          g.lineWidth = 3.6; [22, 74].forEach((x) => { g.beginPath(); g.arc(x, 105, 16, 0, Math.PI * 2); g.stroke(); });
+          L(3, [22, 105], [40, 84], [62, 84], [74, 105]); L(3, [40, 84], [48, 105], [62, 84]); L(3, [40, 84], [38, 74]); L(3, [62, 84], [64, 70], [71, 68]);
+          dot(61, 29, 8.5); L(13, [38, 70], [54, 45]); L(5.5, [54, 47], [62, 60], [69, 68]); L(7, [38, 70], [53, 87], [48, 104]); L(7, [38, 70], [46, 86], [40, 98]);
         },
         () => {                                                                                                               // 推菜籃車
-          dot(35, 17, 8.5); L(13, [33, 35], [29, 68]); L(8, [29, 68], [37, 96], [39, 121]); L(8, [29, 68], [21, 96], [11, 119]); L(6, [39, 122], [46, 122]); L(6, [11, 120], [18, 123]);
-          L(6, [33, 38], [47, 52], [59, 56]); L(3.4, [59, 56], [63, 70]); g.fillRect(61, 66, 28, 27); L(3.4, [65, 92], [65, 112]); L(3.4, [85, 92], [85, 112]); dot(65, 117, 5); dot(85, 117, 5);
+          dot(35, 17, 8.5); L(15, [33, 35], [29, 68]); L(8, [29, 68], [37, 96], [39, 121]); L(8, [29, 68], [21, 96], [11, 119]); L(6, [39, 122], [46, 122]); L(6, [11, 120], [18, 123]);
+          L(6, [33, 38], [47, 52], [59, 56]); L(3, [59, 56], [63, 70]); g.fillRect(61, 66, 28, 27); L(3, [65, 92], [65, 112]); L(3, [85, 92], [85, 112]); dot(65, 117, 5); dot(85, 117, 5);
         },
         () => {                                                                                                               // 撐傘
           stand(-2, 32); g.beginPath(); g.ellipse(54, 18, 36, 14, 0, Math.PI, 0); g.closePath(); g.fill();
-          L(3, [56, 18], [56, 54]); L(6, [46, 52], [53, 62], [56, 52]); L(6, [46, 52], [38, 68], [39, 84]);
+          L(2.6, [56, 18], [56, 54]); L(6, [46, 52], [53, 62], [56, 52]); L(6, [46, 52], [38, 68], [39, 84]);
         },
         () => {                                                                                                               // 牽小孩
           walker(-12, false); L(6, [37, 35], [28, 52], [22, 64]); L(5.5, [37, 35], [50, 56], [62, 74]);
-          dot(73, 64, 6.5); L(10, [73, 78], [73, 98]); L(6, [73, 98], [69, 122]); L(6, [73, 98], [78, 122]); L(4.5, [73, 80], [62, 74]);
+          dot(73, 64, 6.5); L(11, [73, 78], [73, 98]); L(6, [73, 98], [69, 122]); L(6, [73, 98], [78, 122]); L(4.5, [73, 80], [62, 74]);
         },
         () => {                                                                                                               // 遛狗
           walker(-16, false); L(6, [33, 35], [24, 52], [18, 64]); L(6, [33, 35], [42, 52], [48, 62]);
-          L(2.4, [48, 62], [72, 102]); L(9, [68, 108], [85, 108]); dot(89, 101, 5.5); L(3.4, [69, 108], [68, 122]); L(3.4, [84, 108], [85, 122]); L(3.4, [67, 106], [60, 98]);
+          L(2.2, [48, 62], [72, 102]); L(9, [68, 108], [85, 108]); dot(89, 101, 5.5); L(3, [69, 108], [68, 122]); L(3, [84, 108], [85, 122]); L(3, [67, 106], [60, 98]);
         },
-      ];
-      POSE.forEach((draw, i) => { g.save(); g.translate((i % 4) * CW, Math.floor(i / 4) * CH); draw(); g.restore(); });
+      ][i]();
+    };
+    const t = new T.CanvasTexture(sheet(CW * 8, CH * 3, (g) => {
+      for (let row = 0; row < 3; row++) for (let i = 0; i < 8; i++) {
+        const cell = sheet(CW, CH, (c) => {
+          figure(c, i);
+          c.globalCompositeOperation = 'source-in';                             // 剪影換成顏料的顏色
+          c.fillStyle = PEOPLE_HUE[row * 8 + i]; c.fillRect(0, 0, CW, CH);
+          c.globalCompositeOperation = 'source-atop';                           // 水彩：顏料不均勻，上面淡、下面積得比較濃
+          const wash = c.createLinearGradient(0, 0, 0, CH);
+          wash.addColorStop(0, 'rgba(255,250,240,.34)'); wash.addColorStop(0.55, 'rgba(255,250,240,0)'); wash.addColorStop(1, 'rgba(40,20,10,.2)');
+          c.fillStyle = wash; c.fillRect(0, 0, CW, CH);
+          for (let n = 0; n < 16; n++) { c.fillStyle = rnd() < 0.55 ? 'rgba(255,248,235,.2)' : 'rgba(50,25,15,.16)'; c.beginPath(); c.arc(rnd() * CW, rnd() * CH, 5 + rnd() * 16, 0, Math.PI * 2); c.fill(); }
+        });
+        g.drawImage(cell, i * CW, row * CH);
+      }
     }));
     t.anisotropy = 4;
     return t;
+  }
+
+  // ---------- 街道細部：羅斯福路的車道線、公車專用道、斑馬線、中央公車站、路邊的公車亭與停靠區 ----------
+  const X = window.ATLAS_DETAIL || {};
+  const inBox = (q, m) => Math.abs(q[0]) < HW - (m || 0) && Math.abs(q[1]) < HH - (m || 0);
+  const onRoad = (x, y) => { const p = { x, y }; return inAny(p, D.major) || inAny(p, D.minor) || inAny(p, D.lane); };
+  const spots = {}, busStops = [];                                              // spots：議題要用到的幾個位置
+  let stalls = null, forceStalls = false;
+  const nightTime = () => sky.time >= 17.5 || sky.time < 1;
+  function ribbon(pos, line, half, off, dash) {                                 // 沿著折線鋪一條平的帶子。off：往右偏；dash：[實, 空]
+    let run = 0;
+    for (let i = 0; i + 1 < line.length; i++) {
+      const a = line[i], b = line[i + 1], dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy);
+      if (len < 0.01) continue;
+      const ux = dx / len, uy = dy / len, rx = uy, ry = -ux;
+      const quad = (s0, s1) => {
+        const p = [[s0, -half], [s1, -half], [s1, half], [s0, half]].map(([t, o]) => [a[0] + ux * t + rx * (off + o), a[1] + uy * t + ry * (off + o)]);
+        if (!p.every((q) => inBox(q))) return;
+        [0, 1, 2, 0, 2, 3].forEach((k) => pos.push(p[k][0], 0, -p[k][1]));
+      };
+      if (!dash) quad(0, len);
+      else { const per = dash[0] + dash[1]; for (let t = -(run % per); t < len; t += per) { const s0 = Math.max(0, t), s1 = Math.min(len, t + dash[0]); if (s1 > s0) quad(s0, s1); } }
+      run += len;
+    }
+  }
+  function paint(pos, color, y, opt) {                                          // 把一堆平的三角形變成一層；opt 有給就是不受光影響的半透明色
+    if (!pos.length) return null;
+    const g = new T.BufferGeometry(), nor = new Float32Array(pos.length);
+    for (let i = 1; i < nor.length; i += 3) nor[i] = 1;
+    g.setAttribute('position', new T.Float32BufferAttribute(pos, 3));
+    g.setAttribute('normal', new T.BufferAttribute(nor, 3));
+    const m = new T.Mesh(g, opt ? new T.MeshBasicMaterial(Object.assign({ color, side: T.DoubleSide, transparent: true, depthWrite: false }, opt)) : fill(new T.MeshLambertMaterial({ color, side: T.DoubleSide })));
+    m.position.y = y; m.receiveShadow = !opt; if (opt) m.renderOrder = 2;
+    scene.add(m);
+    return m;
+  }
+  function shelter(k, x, y, a, nx, ny) {                                        // 公車亭：白色頂棚、玻璃背板、藍色站名、木頭長椅、廣告燈箱。(nx, ny) 指向背對馬路的那一側
+    const cx = Math.cos(a), cy = Math.sin(a);
+    k.tone('#f1f3f4'); k.box(x, y, a, 3.7, 1.5, 3.3, 3.5);
+    k.tone('#cfe3ea'); k.box(x + nx * 1.3, y + ny * 1.3, a, 3.5, 0.05, 0.9, 3.3);
+    k.tone('#2a6fd0'); k.box(x + nx * 1.22 + cx * 1.1, y + ny * 1.22 + cy * 1.1, a, 2.3, 0.07, 2.5, 3.1);
+    k.tone('#f2c230'); [-3.5, 3.5].forEach((e) => k.box(x + cx * e + nx * 1.3, y + cy * e + ny * 1.3, a, 0.1, 0.1, 0.5, 3.3));
+    k.tone('#c58a4a'); k.box(x + cx * 1.3 + nx * 0.7, y + cy * 1.3 + ny * 0.7, a, 1.7, 0.3, 1.0, 1.13);
+    k.tone('#e9523a'); k.box(x - cx * 4.7 + nx * 0.9, y - cy * 4.7 + ny * 0.9, a, 0.9, 0.1, 0.9, 2.9);
+  }
+  function streets() {
+    const white = [], lane = [], zebra = [], LW = 3.3;
+    (X.roads || []).forEach((r) => {
+      const w = (r.n * LW) / 2;
+      [-w, w].forEach((o) => ribbon(white, r.p, 0.16, o));
+      for (let i = 1; i < r.n; i++) ribbon(white, r.p, 0.14, -w + i * LW, [4, 6]);
+    });
+    (X.bus || []).forEach((p) => { ribbon(lane, p, 1.75, 0); [-1.75, 1.75].forEach((o) => ribbon(white, p, 0.16, o)); });
+    const bars = (line, half) => {                                              // 斑馬線：一條一條跟車行方向平行的白線
+      for (let i = 0; i + 1 < line.length; i++) {
+        const a = line[i], b = line[i + 1], len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, ux = (b[0] - a[0]) / len, uy = (b[1] - a[1]) / len;
+        for (let t = 0.5; t < len; t += 1.3) {
+          const x = a[0] + ux * t, y = a[1] + uy * t;
+          if (!inBox([x, y], 4) || !onRoad(x, y)) continue;
+          const p = [[-0.32, -half], [0.32, -half], [0.32, half], [-0.32, half]].map(([d, o]) => [x + ux * d + uy * o, y + uy * d - ux * o]);
+          [0, 1, 2, 0, 2, 3].forEach((n) => zebra.push(p[n][0], 0, -p[n][1]));
+        }
+      }
+    };
+    (X.cross || []).forEach((l) => bars(l, 2.2));
+    spots.cross = (X.cross || []).filter((l) => inBox(l[0], 4));
+    busStops.length = 0;
+    if (heroSpan && heroRing) {
+      // 以天橋為基準：u 是跨過馬路的方向（正的是對街），t 是沿著路（正的往東南）
+      const p = heroSpan, a = nearRing(p[0], heroRing) < nearRing(p[p.length - 1], heroRing) ? p[0] : p[p.length - 1], b = a === p[0] ? p[p.length - 1] : p[0];
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]), ux = (b[0] - a[0]) / len, uy = (b[1] - a[1]) / len;
+      let sx = uy, sy = -ux; if (sx < 0) { sx = -sx; sy = -sy; }
+      const ang = Math.atan2(sy, sx), mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      const at = (u, t) => [mid[0] + ux * u + sx * t, mid[1] + uy * u + sy * t];
+      bars([at(-len / 2 - 3, -15), at(len / 2 + 3, -15)], 2.6);                 // 天橋西北邊、九十巷口的行人穿越道
+      spots.cross.push([at(-len / 2 - 3, -15), at(len / 2 + 3, -15)]);
+      let sum = 0, cnt = 0;                                                     // 公車專用道在路中間的哪裡
+      (X.bus || []).forEach((l) => l.forEach((q) => { if (Math.hypot(q[0] - mid[0], q[1] - mid[1]) < 70) { sum += (q[0] - mid[0]) * ux + (q[1] - mid[1]) * uy; cnt++; } }));
+      const uc = cnt ? sum / cnt : 0, up = uc + 5.4, k = kit();
+      // 中央的公車站：月台從天橋下面穿過，上面是深色的玻璃頂棚
+      let q = at(up, 0);
+      k.tone('#ebe7dd'); k.box(q[0], q[1], ang, 36, 1.7, 0.45, 0.8);
+      k.tone('#4d5964'); k.box(q[0], q[1], ang, 32, 2, 3.5, 3.66);
+      k.tone('#dfe3e6'); for (let t = -30; t <= 30; t += 6) { q = at(up + 1.4, t); k.box(q[0], q[1], ang, 0.12, 0.12, 0.8, 3.5); }
+      q = at(up + 1.5, 0); k.tone('#b9d3df'); k.box(q[0], q[1], ang, 32, 0.05, 0.9, 2.7);
+      spots.platform = at(up, 0);
+      words.push(sign('公車專用道', at(uc, 52)[0], at(uc, 52)[1], ang, 3));
+      // 對街往東南約九十公尺：路邊的公車亭與畫在路面上的公車停靠區（現在沒有公車停靠）
+      let d = 2; while (d < 40 && onRoad(at(d, 92)[0], at(d, 92)[1])) d += 0.5;
+      const c = at(d - 2, 92), box = [[-12, -1.7], [12, -1.7], [12, 1.7], [-12, 1.7], [-12, -1.7]].map(([t, o]) => [c[0] + sx * t + ux * o, c[1] + sy * t + uy * o]);
+      ribbon(white, box, 0.16, 0);
+      words.push(sign('公車停靠區', c[0], c[1], ang, 2.6));
+      q = at(d + 2.8, 92); shelter(k, q[0], q[1], ang, ux, uy); busStops.push(q);
+      spots.layby = { c, ang, sx, sy, ux, uy, stop: q };
+      spots.frame = { at, len, uc };
+      const grp = k.mesh(); scene.add(grp);
+    }
+    paint(lane, mix(C.major, '#6e2a22', 0.3), 0.455);
+    paint(white, '#fffdf6', 0.47);
+    paint(zebra, '#fffdf6', 0.48);
+  }
+  // 公館夜市的攤位：推車加上彩色的棚子和一盞燈，傍晚五點半以後才出來
+  function nightMarket() {
+    stalls = null;
+    const poly = (X.night || [])[0];
+    if (!poly) return;
+    const k = kit(), glow = [], tones = ['#e8452c', '#f2b632', '#2f8fe6', '#3fa66b', '#f08a2c'];
+    const xs = poly.map((q) => q[0]), ys = poly.map((q) => q[1]);
+    let n = 0;
+    for (let x = Math.min(...xs); x < Math.max(...xs); x += 6.5) for (let y = Math.min(...ys); y < Math.max(...ys); y += 6.5) {
+      const px = x + rnd() * 2, py = y + rnd() * 2, pt = { x: px, y: py };
+      if (!inside(pt, poly) || inAny(pt, D.major) || D.buildings.some((b) => inside(pt, b.p))) continue;
+      let best = 1e9, a = 0;                                                    // 攤位順著最近的那一段街邊擺
+      for (let i = 0; i + 1 < poly.length; i++) {
+        const p0 = poly[i], p1 = poly[i + 1], dx = p1[0] - p0[0], dy = p1[1] - p0[1], t = Math.max(0, Math.min(1, ((px - p0[0]) * dx + (py - p0[1]) * dy) / (dx * dx + dy * dy || 1)));
+        const dist = Math.hypot(px - p0[0] - dx * t, py - p0[1] - dy * t);
+        if (dist < best) { best = dist; a = Math.atan2(dy, dx); }
+      }
+      k.tone('#f4efe4'); k.box(px, py, a, 1.3, 0.8, 0.5, 1.5);
+      k.tone('#8d8478'); [[-1.5, -1], [1.5, -1], [1.5, 1], [-1.5, 1]].forEach(([e, o]) => k.box(px + Math.cos(a) * e - Math.sin(a) * o, py + Math.sin(a) * e + Math.cos(a) * o, a, 0.06, 0.06, 0.5, 2.6));
+      k.tone(tones[n++ % tones.length]); k.box(px, py, a, 1.75, 1.2, 2.6, 2.85);
+      k.tone('#fff0a0'); k.box(px, py, a, 0.28, 0.28, 2.25, 2.6);
+      for (let i = 0; i < 14; i++) { const a0 = (i / 14) * Math.PI * 2, a1 = ((i + 1) / 14) * Math.PI * 2; glow.push(px, 0, -py, px + Math.cos(a0) * 4.2, 0, -py + Math.sin(a0) * 4.2, px + Math.cos(a1) * 4.2, 0, -py + Math.sin(a1) * 4.2); }
+    }
+    stalls = k.mesh();
+    stalls.children[0].material = new T.MeshBasicMaterial({ vertexColors: true, side: T.DoubleSide });   // 不吃光：晚上棚子和燈還是亮的
+    stalls.children[0].castShadow = false;
+    const g = paint(glow, '#ffd66b', 0.62, { opacity: 0.3 });
+    if (g) { scene.remove(g); stalls.add(g); }
+    scene.add(stalls);
+    spots.night = { poly, c: [xs.reduce((s, v) => s + v, 0) / xs.length, ys.reduce((s, v) => s + v, 0) / ys.length], count: n };
+    stalls.visible = (forceStalls || nightTime()) && !survey;
   }
 
   // ---------- 街上的白模：公車亭 ----------
@@ -795,7 +964,7 @@
     const k = kit(), F = (D.flows || {}).car || [], white = '#fcfbf7', grey = '#e4e5e3';
     const road = (p) => inAny(p, D.major) || inAny(p, D.minor) || inAny(p, D.lane);
     const built = (p) => D.buildings.some((b) => inside(p, b.p));
-    const stops = [];
+    const stops = busStops;                                                     // 已經照實際位置放好的公車亭附近不再放
     F.forEach((l) => {
       const w = l[0], q = l[1];
       if (w < 1.4) return;
@@ -855,6 +1024,30 @@
       tags.appendChild(el);
       pins.push({ el, stem: el.firstChild, at: s.at, lift: (s.h || 0) + 40 });
     });
+    const pin = (zh, en, x, y, lift, lens, issue, color) => {                    // 只在某個分析模式（或某一則議題）才出現的標籤
+      const el = document.createElement('div');
+      el.className = 'note note-lens'; el.innerHTML = '<i></i><span><b></b></span>';
+      el.querySelector('b').textContent = zh; el.querySelector('span').appendChild(document.createTextNode(en || ''));
+      if (color) el.style.setProperty('--tone', color);
+      el.style.display = 'none'; tags.appendChild(el);
+      pins.push({ el, stem: el.firstChild, at: { x, y }, lift, lens, issue });
+    };
+    const hero = S.notes.find((n) => n.mark === 'main');
+    (S.zones || []).forEach((z) => {
+      const ring = z.use === 'night' ? (X.night || [])[0] : z.poly, c = z.use === 'hero' && hero ? [hero.at.x + 30, hero.at.y - 30] : ring ? [ring.reduce((t, q) => t + q[0], 0) / ring.length, ring.reduce((t, q) => t + q[1], 0) / ring.length] : null;
+      if (c) pin(z.zh, z.note || '', z.at ? z.at[0] : c[0], z.at ? z.at[1] : c[1], 46, 'shop', null, z.color);
+    });
+    if (S.arts) {
+      S.arts.nodes.forEach((n) => { const q = toXY(n); pin(n.zh, n.en || '', q.x, q.y, (n.h || 6) + 34, 'art', null, C.heroPink); });
+      (S.arts.links || []).forEach(([i, j, fest]) => { if (!fest) return; const a = toXY(S.arts.nodes[i]), b = toXY(S.arts.nodes[j]); pin(fest, '', (a.x + b.x) / 2, (a.y + b.y) / 2, 95, 'art', null, C.key2); });
+    }
+    const L = spots.layby, sk = spots.sky, N = spots.night;
+    if (L) { pin('家長臨時接送區', '原本閒置的公車停靠區', L.c[0], L.c[1], 22, 'issue', 0, C.heroPink); pin('公車亭', '水源市場站', L.stop[0], L.stop[1], 14, 'issue', 0); }
+    if (sk) {
+      let q = sk.at(sk.len - 1.5, sk.W + 1.5); pin('天橋電梯（新增）', '無障礙上下天橋', q[0], q[1], 24, 'issue', 1, C.heroPink);
+      q = sk.at(5, -9); pin('橋下空間改善', '一樓橋下與樓梯下方', q[0], q[1], 12, 'issue', 1, C.heroPink);
+    }
+    if (N) pin('夜間行人徒步區', '晚上 6:00–9:00 車輛不進入', N.c[0], N.c[1], 40, 'issue', 2, C.heroPink);
   }
   const v = new T.Vector3();
   function place() {
@@ -877,9 +1070,16 @@
     Object.keys(LENS).forEach((k) => {
       const b = document.createElement('button');
       b.dataset.lens = k; b.textContent = LENS[k][0];
-      b.addEventListener('click', () => setMode('a', k));
+      b.addEventListener('click', () => (k === 'issue' ? setIssue(issueAt) : setMode('a', k)));
       bar.appendChild(b);
     });
+    const tabs = document.getElementById('issue-tabs');
+    (S.issues || []).forEach((it, i) => {
+      const b = document.createElement('button');
+      b.textContent = '議題 ' + (i + 1); b.addEventListener('click', () => setIssue(i));
+      tabs.appendChild(b);
+    });
+    if (!(S.issues || []).length) bar.querySelector('[data-lens="issue"]').hidden = true;
     document.getElementById('atlas-top').addEventListener('click', () => fly({ el: view.el > 1.2 ? (survey ? 0.6155 : HOME.el) : 1.5 }));
     document.getElementById('atlas-name').textContent = S.name.zh;
     document.getElementById('atlas-name-en').textContent = S.name.en;
@@ -941,6 +1141,7 @@
     const hh = Math.floor(t) % 24, mm = Math.round((t - Math.floor(t)) * 60);
     const clock = document.getElementById('set-clock');
     if (clock) clock.textContent = String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0') + '　' + w.label;
+    if (stalls) stalls.visible = (forceStalls || nightTime()) && !survey;
     renderer.shadowMap.needsUpdate = true; dirty = true;
   }
 
@@ -974,14 +1175,14 @@
     // 調色
     if (!EDIT) return;                                                         // 發布出去的網站到這裡為止，沒有調色與輸出的介面
     panel.insertAdjacentHTML('beforeend', '<div id="set-edit"><h2>輸出</h2><button id="atlas-render" title="把現在的角度存成 PNG；按住 Shift 再按，背景透明">Render 存成 PNG</button>' +
-      '<p class="set-tip">存的是現在畫面的角度。按住 Shift 再按，背景是透明的。</p><h2>山的圖案</h2><div id="set-hill" class="set-pick"></div><h2>顏色</h2><div id="set-colors"></div><button id="set-reset">回到檔案裡的顏色</button>' +
+      '<p class="set-tip">存的是現在畫面的角度。按住 Shift 再按，背景是透明的。</p><h2>畫面</h2><button id="set-wc"></button><h2>山的圖案</h2><div id="set-hill" class="set-pick"></div><h2>顏色</h2><div id="set-colors"></div><button id="set-reset">回到檔案裡的顏色</button>' +
       '<p class="set-tip">這一區只有在自己電腦上預覽時才會出現。調好之後跟 Claude 說「存顏色」，或按下面的按鈕複製，貼到 data/style.js 蓋掉原本的內容再上傳。</p>' +
       '<button id="set-copy">複製 style.js 的內容</button><textarea id="set-out" rows="5" readonly></textarea></div>');
     const list = document.getElementById('set-colors'), out = document.getElementById('set-out');
     document.getElementById('atlas-render').addEventListener('click', (e) => shot(e.shiftKey));
     const text = () => {
       const lines = PALETTE.concat([['slab', '底座側邊'], ['pier', '橋墩']]).map(([k, label]) => "    " + k + ": '" + C[k] + "',".padEnd(22) + '// ' + label);
-      return '// 網站的顏色與天氣。由頁面上的調色面板產生。時間不用設定，網站會跟著看的人當下的時刻走。\nwindow.ATLAS_STYLE = {\n  palette: {\n' + lines.join('\n') + '\n  },\n  hillPattern: \'' + hillKind + '\',\n  weather: \'' + sky.weather + '\',\n};\n';
+      return '// 網站的顏色與天氣。由頁面上的調色面板產生。時間不用設定，網站會跟著看的人當下的時刻走。\nwindow.ATLAS_STYLE = {\n  palette: {\n' + lines.join('\n') + '\n  },\n  watercolor: ' + wc + ',\n  hillPattern: \'' + hillKind + '\',\n  weather: \'' + sky.weather + '\',\n};\n';
     };
     let wait = null;
     const inputs = {}, store = () => {
@@ -996,6 +1197,9 @@
       inp.addEventListener('input', () => { C[key] = inp.value; store(); clearTimeout(wait); wait = setTimeout(build, 140); });   // 改顏色：稍等一下再整張重畫
       row.append(inp, label); list.appendChild(row);
     });
+    const wcBtn = document.getElementById('set-wc'), wcShow = () => { wcBtn.textContent = '水彩濾鏡：' + (wc ? '開' : '關'); stage.classList.toggle('wc', wc); };
+    wcBtn.addEventListener('click', () => { wc = !wc; try { localStorage.setItem(STORE + '-wc', wc ? '1' : '0'); } catch (e) { /* 只留在這一次 */ } wcShow(); out.value = text(); });
+    wcShow();
     const hillBox = document.getElementById('set-hill');
     HILLS.forEach(([k, label]) => {
       const b = document.createElement('button');
@@ -1027,15 +1231,15 @@
       });
     });
     slices.length = 0;
-    [fills, inks, solidOnly, heightOnly, roofOnly, crowd, colorOnly, growers, words, blobs, lensObj.walk, lensObj.car, lensObj.height, lensObj.reach].forEach((a) => { a.length = 0; });
+    [fills, inks, solidOnly, heightOnly, roofOnly, crowd, colorOnly, paleOnly, hillOnly, issueObj[0], issueObj[1], issueObj[2], lensObj.shop, lensObj.art, lensObj.issue, growers, words, blobs, lensObj.walk, lensObj.car, lensObj.height, lensObj.reach].forEach((a) => { a.length = 0; });
     flock.length = 0;
     derive(); seed = 11;
     heroSpan = null;
-    ground(); buildings(); bridges(); skywalk(); hills();
+    ground(); buildings(); bridges(); skywalk(); streets(); nightMarket(); hills();
     const leaf = texTrees();
     colorOnly.push(standees(D.trees.filter((t) => !t[4]), 9, 14.5, 3, 2, leaf, 3.4));
     colorOnly.push(standees(D.trees.filter((t, i) => t[5] > 0 && i % 5 === 0), 9, 14.5, 3, 2, leaf, 3.4, (t) => 0.2 + t[5] * RISE));   // 山上只留一些樹
-    crowd.push(standees(D.people.map((t, i) => [t[0], t[1], t[2], (i * 5 + t[3]) % 8]), 3.45, 4.6, 4, 2, texPeople(), 0.9));
+    crowd.push(standees(D.people.map((t, i) => [t[0], t[1], t[2], (i * 5 + t[3]) % 24]), 3.45, 4.6, 8, 3, texPeople(), 0.9));
     traffic();
     roadNames(); lenses(); surveyBase();
     town.scale.y = Math.max(0.001, ease(grow));
@@ -1132,23 +1336,48 @@
   // ---------- 分析模式（lens）。量體永遠是標準的不透明樣子，只有「建築高度」會換成依高度上色 ----------
   const LENS = {
     map: ['地圖', ''],
-    walk: ['人流', '粉色的點是行人，越靠近市場、捷運出口與寶藏巖越密。依步行路網與距離推估，不是實測人數。'],
-    car: ['車流', '點的顏色與數量代表道路等級：紅是幹道與高架，橘是次要道路，黃是巷弄。依道路分級推估，不是實測車流量。'],
+    car: ['車流', '大的點是汽車：紅是幹道與高架、橘是次要道路、黃是巷弄。小的藍點是機車，數量比汽車多、速度也快。依道路分級推估，不是實測車流量。'],
+    walk: ['人流', '桃紅是人行道上的行人，黃色是行人穿越道，橘色是沒有人行道、人車共用的巷弄。越靠近市場、捷運出口與寶藏巖越密。依路網與距離推估，不是實測人數。'],
+    shop: ['商圈', '藍色是公館商圈（羅斯福路與汀州路之間的店面街區），黃色是公館夜市（傍晚以後的攤商），桃紅是水源市場（白天的傳統市場）。範圍是示意，不是正式劃定的界線。'],
+    art: ['藝文網絡', '水源市場與樓上的水源劇場、寶藏巖國際藝術村、蟾蜍山煥民新村，加上公館巷弄藝術節串起的公館商圈，彼此都在步行可到的距離內。'],
+    issue: ['議題', ''],
     height: ['建築高度', '淡黃是低樓層，越往桃紅、紫色越高。高度多半由樓層數換算，缺資料的是估計值。'],
     reach: ['步行圈', '以水源市場為圓心的直線距離：200、400、800 公尺，步行大約 3、5、10 分鐘。實際路程會比直線遠。'],
   };
   function setMode(m, l) {
     mode = 'a'; if (l) lens = l;
-    const study = lens !== 'map', tall = lens === 'height';
-    solidOnly.forEach((o) => { o.visible = !tall; });
+    const study = lens !== 'map', tall = lens === 'height', issue = lens === 'issue';
+    solidOnly.forEach((o) => { o.visible = !tall && !issue; });
     heightOnly.forEach((o) => { o.visible = tall; });
+    paleOnly.forEach((o) => { o.visible = issue; });
+    hillOnly.concat(colorOnly).forEach((o) => { if (o) o.visible = !issue; });   // 議題：山、樹也收起來，只留羅斯福路和主體有顏色
     crowd.forEach((o) => { o.visible = lens !== 'walk' && lens !== 'car'; });   // 人流、車流時把裝飾的小人收起來，免得跟流動的點混在一起
     Object.keys(lensObj).forEach((k) => lensObj[k].forEach((o) => { o.visible = lens === k; }));
+    issueObj.forEach((list, i) => list.forEach((o) => { o.visible = issue && i === issueAt; }));
+    forceStalls = issue && issueAt === 2;                                     // 夜市那一則：不管幾點都把攤位擺出來
+    pins.forEach((p) => { if (p.lens) p.el.style.display = p.lens === lens && (p.issue == null || p.issue === issueAt) ? '' : 'none'; });
     words.forEach((o) => { o.visible = !bare; });
     [...document.getElementById('atlas-lens').children].forEach((b) => b.classList.toggle('on', b.dataset.lens === lens));
     const note = document.getElementById('lens-note');
-    note.textContent = study ? LENS[lens][1] : ''; note.hidden = !study;
+    note.textContent = study ? LENS[lens][1] : ''; note.hidden = !study || !LENS[lens][1];
+    const card = document.getElementById('issue-card'), it = (S.issues || [])[issueAt];
+    card.hidden = !issue || !it;
+    if (it) {
+      document.getElementById('issue-title').textContent = it.title;
+      document.getElementById('issue-find').textContent = it.find;
+      document.getElementById('issue-fix').textContent = it.fix;
+      [...document.getElementById('issue-tabs').children].forEach((b, i) => b.classList.toggle('on', i === issueAt));
+    }
     applySky();
+  }
+  function issueSpot(i) {                                                       // 每一則議題要看的地方
+    const sk = spots.sky, c = i === 0 && spots.layby ? spots.layby.c : i === 1 && sk ? sk.at(sk.len / 2, 0) : i === 2 && spots.night ? spots.night.c : null;
+    return c ? { x: c[0], y: c[1], size: i === 2 ? 110 : 62, az: i === 1 ? 2.2 : HOME.az } : null;   // 天橋要從對街那一側看，才不會被主體擋住
+  }
+  function setIssue(i) {
+    issueAt = i; setMode('a', 'issue');
+    const t = issueSpot(i);
+    if (t) { view.az = ((view.az - t.az + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI + t.az; fly({ tx: t.x, tz: -t.y, ty: 0, size: t.size, az: t.az, el: 0.7 }); }
   }
 
   // ---------- 分析模式的圖層 ----------
@@ -1198,6 +1427,65 @@
       f.pts.geometry.attributes.position.needsUpdate = true;
     });
   }
+  const tint3 = (mesh, opacity) => { mesh.children[0].material = new T.MeshBasicMaterial({ vertexColors: true, side: T.DoubleSide, transparent: opacity < 1, opacity }); mesh.children[0].castShadow = false; return mesh; };
+  // 商圈類型：三塊範圍各蓋一層顏色
+  function zones() {
+    const hero = S.notes.find((n) => n.mark === 'main');
+    (S.zones || []).forEach((z) => {
+      const list = z.use === 'night' ? (X.night || []).map((r) => [r]) : z.poly ? [[z.poly]] : [];
+      if (list.length) wash(list, z.color, z.use === 'night' ? 0.85 : 0.38, z.use === 'night' ? 0.64 : 0.6, 'shop');
+      if (z.use === 'hero' && hero) {
+        const m = new T.Mesh(up(new T.CircleGeometry(40, 48)), new T.MeshBasicMaterial({ color: z.color, transparent: true, opacity: 0.5, depthWrite: false }));
+        m.position.set(hero.at.x, 0.68, -hero.at.y); m.renderOrder = 1; scene.add(m); lensObj.shop.push(m);
+      }
+    });
+  }
+  // 藝文網絡：幾個據點各一個圓，據點之間用拱起來的線連著
+  function network() {
+    const A = S.arts;
+    if (!A) return;
+    const pts = A.nodes.map((n) => { const q = toXY(n); return [q.x, q.y, n.h || 6]; });
+    pts.forEach((q, i) => {
+      [[22, 0.3], [9, 0.9]].forEach(([r, o]) => {
+        const m = new T.Mesh(up(new T.CircleGeometry(r, 40)), new T.MeshBasicMaterial({ color: i ? C.heroPink : C.key2, transparent: true, opacity: o, depthWrite: false }));
+        m.position.set(q[0], 0.7, -q[1]); m.renderOrder = 1; scene.add(m); lensObj.art.push(m);
+      });
+    });
+    (A.links || []).forEach(([i, j, fest]) => {
+      const a = pts[i], b = pts[j], d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+      const curve = new T.QuadraticBezierCurve3(new T.Vector3(a[0], a[2], -a[1]), new T.Vector3((a[0] + b[0]) / 2, Math.max(a[2], b[2]) + 30 + d * 0.28, -(a[1] + b[1]) / 2), new T.Vector3(b[0], b[2], -b[1]));
+      const m = new T.Mesh(new T.TubeGeometry(curve, 48, fest ? 1.7 : 1.1, 6), new T.MeshBasicMaterial({ color: fest ? C.key2 : C.heroPink }));
+      scene.add(m); lensObj.art.push(m);
+    });
+  }
+  // 議題：整張圖淡成白色，只留羅斯福路和主體有顏色；每一則議題再標出它的改善位置
+  function issues() {
+    const fade = [-HW, 0, HH, HW, 0, HH, HW, 0, -HH, -HW, 0, HH, HW, 0, -HH, -HW, 0, -HH];
+    lensObj.issue.push(paint(fade, '#ffffff', 0.7, { opacity: 0.74 }));
+    const road = [];
+    (X.roads || []).forEach((r) => ribbon(road, r.p, r.n * 1.72, 0));
+    (X.bus || []).forEach((l) => ribbon(road, l, 1.9, 0));
+    const hi = paint(road, mix(C.major, '#e8452c', 0.45), 0.76, { opacity: 0.95 }); if (hi) lensObj.issue.push(hi);
+    const pink = C.heroPink, L = spots.layby, sk = spots.sky, N = spots.night;
+    if (L) {                                                                    // 一：閒置的公車停靠區改成家長臨時接送區
+      const box = [], k = kit();
+      ribbon(box, [[L.c[0] - L.sx * 12, L.c[1] - L.sy * 12], [L.c[0] + L.sx * 12, L.c[1] + L.sy * 12]], 1.7, 0);
+      issueObj[0].push(paint(box, pink, 0.82, { opacity: 0.8 }));
+      [-7, 0, 7].forEach((t) => { const x = L.c[0] + L.sx * t, y = L.c[1] + L.sy * t; k.tone('#fcfbf7'); k.box(x, y, L.ang, 2.4, 1.05, 0.9, 1.75); k.tone('#dfe3e6'); k.box(x, y, L.ang, 1.3, 0.95, 1.75, 2.45); });
+      const g = k.mesh(); scene.add(g); issueObj[0].push(g);
+    }
+    if (sk) {                                                                   // 二：橋下空間改善、兩端加電梯
+      const under = [], k = kit(), W = sk.W, H = sk.H;
+      [[-1, 12, 15], [sk.len - 7, sk.len + 2, 15]].forEach(([s0, s1, o]) => { const a = sk.at(s0, 0), b = sk.at(s1, 0); ribbon(under, [a, b], o, 0); });
+      issueObj[1].push(paint(under, pink, 0.82, { opacity: 0.42 }));
+      [[2.6, W + 1.5], [sk.len - 1.5, W + 1.5]].forEach(([s0, o]) => { const q = sk.at(s0, o); k.tone(pink); k.box(q[0], q[1], sk.ang, 1.25, 1.25, 0.5, H + 3.2); k.tone('#ffffff'); k.box(q[0], q[1], sk.ang, 1.35, 1.35, H + 3.2, H + 3.5); });
+      const g = tint3(k.mesh(), 0.8); scene.add(g); issueObj[1].push(g);
+    }
+    if (N) {                                                                    // 三：夜市的街道晚上改成行人徒步區
+      const m = new T.Mesh(up(new T.ShapeGeometry(shapes([[N.poly]]))), new T.MeshBasicMaterial({ color: pink, transparent: true, opacity: 0.62, depthWrite: false }));
+      m.position.y = 0.82; m.renderOrder = 2; scene.add(m); issueObj[2].push(m);
+    }
+  }
   function lenses() {
     const F = D.flows || { car: [], walk: [] };
     const flat = (l, y) => { const p = []; for (let i = 0; i < l[1].length; i += 2) p.push([l[1][i], l[1][i + 1], y]); return p; };
@@ -1206,10 +1494,13 @@
     const cars = F.car.map((l) => ({ w: l[0], p: flat(l, 1.3) }))
       .concat((D.bridges || []).filter((b) => b.k === 'car' && b.f).map((b) => ({ w: b.f, p: b.p.map((q) => [q[0], q[1], q[2] + 1.2]) })));
     stream('car', cars, (w) => 9 + w * 7, (w) => (w >= 2.4 ? '#c8261a' : w >= 1.4 ? '#e8752a' : '#d8a516'), 5.5, 55);
+    stream('car', cars.filter((l) => l.w >= 0.7).map((l) => ({ w: l.w, p: l.p.map((q) => [q[0], q[1], q[2] - 0.3]) })), (w) => 13 + w * 8, () => '#2b4fd6', 3.2, 30);   // 機車：小的藍點，比汽車多也比較快
     // 人流：步道上色，行人越靠近幾個會聚集人的地方越密
     const hubs = S.notes.filter((n) => n.crowd).map((n) => ({ x: n.at.x, y: n.at.y, k: n.crowd }));
     const pull = (x, y) => 0.18 + hubs.reduce((s, h) => s + h.k * Math.exp(-Math.hypot(x - h.x, y - h.y) / 150), 0);
-    wash(D.foot, C.heroPink, 0.4, 0.6, 'walk'); wash(D.lane, C.heroPink, 0.22, 0.58, 'walk');
+    wash(D.foot, C.heroPink, 0.4, 0.6, 'walk'); wash(D.lane, '#f08a2c', 0.5, 0.58, 'walk');   // 人行道是桃紅；沒有人行道的巷弄是橘色
+    const zeb = []; (spots.cross || []).forEach((l) => ribbon(zeb, l, 2.6, 0));
+    const zm = paint(zeb, '#ffd23f', 0.64, { opacity: 0.92 }); if (zm) lensObj.walk.push(zm);          // 行人穿越道是黃色
     hubs.forEach((h) => {                                                       // 聚集點：一圈由濃到淡的光暈
       const m = new T.Mesh(up(new T.CircleGeometry(150 * Math.sqrt(h.k), 48)), new T.MeshBasicMaterial({ map: haloTex(), transparent: true, opacity: 0.6, depthWrite: false }));
       m.position.set(h.x, 0.66, -h.y); m.renderOrder = 1; scene.add(m); lensObj.walk.push(m);
@@ -1217,6 +1508,9 @@
     const walks = F.walk.map((l) => { const p = flat(l, 1.6), mid = p[p.length >> 1]; return { w: l[0] * pull(mid[0], mid[1]), p }; })
       .concat((D.bridges || []).filter((b) => b.k === 'foot').map((b) => { const mid = b.p[b.p.length >> 1]; return { w: pull(mid[0], mid[1]), p: b.p.map((q) => [q[0], q[1], q[2] + 1.5]) }; }));
     stream('walk', walks, () => 5.5, (w) => mix('#f29ac0', '#8c1257', Math.min(1, w / 1.2)), 4.6, 26);
+    const alley = F.car.filter((l) => l[0] < 1).map((l) => { const p = flat(l, 1.6), mid = p[p.length >> 1]; return { w: 0.7 * pull(mid[0], mid[1]), p }; });
+    stream('walk', alley, () => 5, () => '#d9620f', 4.6, 34);                 // 走在巷弄車道上的人
+    zones(); network(); issues();
     // 步行圈：以市場為圓心的三圈
     const hero = S.notes.find((n) => n.mark === 'main');
     if (hero) {
@@ -1401,7 +1695,9 @@
     sun.shadow.bias = -0.0012;
     scene.add(amb, sun, sun.target);
 
+    stage.classList.toggle('wc', wc);
     build(); markers(); legend(); controls(); settings(); floorsUi();
+    setMode(mode);
     fit = fitSize();
     view.size = fit;
     const market = S.notes.find((n) => n.mark === 'main');
@@ -1410,7 +1706,7 @@
     }
     document.getElementById('atlas-count').textContent = D.buildings.length + ' 棟建築　' + D.trees.length + ' 棵樹　' + D.people.length + ' 個人';
     requestAnimationFrame(loop);
-    window.ATLAS = { view, fly, setMode, setFloor, setSurvey, palette: () => PALETTE.reduce((o, [k]) => { o[k] = C[k]; return o; }, {}), sky, applySky, redraw: () => { dirty = true; } };          // 給主控台用：ATLAS.fly({ tx, tz, size, az, el })
+    window.ATLAS = { view, fly, setMode, setIssue, spots, setFloor, setSurvey, palette: () => PALETTE.reduce((o, [k]) => { o[k] = C[k]; return o; }, {}), sky, applySky, redraw: () => { dirty = true; } };          // 給主控台用：ATLAS.fly({ tx, tz, size, az, el })
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { dirty = true; });
   }
   start();

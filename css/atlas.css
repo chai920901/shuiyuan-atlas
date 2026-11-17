@@ -178,3 +178,29 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
 @media (max-width: 560px) {
   .note span { font-size: 8px; } .note span b { font-size: 10px; }
 }
+
+/* ---------- 水彩濾鏡 ---------- */
+#atlas-wash { position: absolute; inset: 0; pointer-events: none; display: none; mix-blend-mode: multiply; opacity: .55;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='420'%3E%3Cfilter id='p' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.035' numOctaves='4' seed='7'/%3E%3CfeColorMatrix values='0 0 0 0 0.82  0 0 0 0 0.74  0 0 0 0 0.62  0.9 0.5 0 0 -0.42'/%3E%3C/filter%3E%3Crect width='420' height='420' filter='url(%23p)'/%3E%3C/svg%3E"); }
+#atlas.wc #atlas-wash { display: block; }
+#atlas.wc #atlas-gl { filter: url(#wc) saturate(1.05); }
+#atlas.wc.survey #atlas-gl { filter: none; }
+@media (hover: none), (max-width: 720px) { #atlas.wc #atlas-gl { filter: none; } }   /* 手機上扭動的濾鏡太吃力，只留紙的斑駁 */
+#set-wc { width: 100%; padding: 7px 0; font-size: 12px; font-weight: 700; letter-spacing: .1em; border: 1.5px solid var(--ink); }
+
+/* ---------- 分析模式才出現的標籤 ---------- */
+.note-lens span { top: -34px; padding: 3px 7px 4px; background: var(--paper); border: 1.5px solid var(--tone, var(--ink)); box-shadow: 2px 2px 0 var(--tone, var(--ink)); font-family: "Noto Sans TC", sans-serif; }
+.note-lens i { border-left: 1.5px solid var(--tone, var(--ink)); opacity: 1; }
+
+/* ---------- 議題卡片 ---------- */
+#issue-card { margin: 0 max(16px, env(safe-area-inset-left)) 6px; max-width: 440px; padding: 10px 12px 12px; pointer-events: auto;
+  background: var(--paper); border: 1.5px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); font-size: 12px; line-height: 1.65; }
+#issue-card[hidden] { display: none; }
+#issue-tabs { display: flex; gap: 6px; margin-bottom: 8px; }
+#issue-tabs button { flex: 1; padding: 6px 0; font-size: 12px; font-weight: 700; letter-spacing: .08em; border: 1.5px solid var(--ink); }
+#issue-tabs button.on { background: var(--ink); color: var(--paper); }
+#issue-card h2 { margin: 0 0 6px; font-size: 15px; font-weight: 900; letter-spacing: .06em; }
+#issue-card p { margin: 4px 0 0; display: flex; gap: 8px; }
+#issue-card p b { flex: none; align-self: flex-start; padding: 0 6px; font-size: 11px; background: var(--ink); color: var(--paper); letter-spacing: .08em; }
+#atlas.survey #issue-card { display: none; }
+@media (max-width: 720px) { #issue-card { margin: 0 12px 6px; font-size: 11px; padding: 8px 10px 10px; } #issue-card h2 { font-size: 13px; } }
