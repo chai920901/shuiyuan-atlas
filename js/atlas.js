@@ -37,7 +37,25 @@
   let treeSet = (STYLE.trees || []).filter((k) => k >= 0 && k < 12), treeBrush = -1;   // treeSet：地圖上用哪幾種樹；treeBrush：種樹時指定種哪一種（-1 是隨機）
   if (EDIT) { try { const v = JSON.parse(localStorage.getItem(STORE + '-treeset') || 'null'); if (v && v.length) treeSet = v; } catch (e) { /* 用檔案裡的 */ } }
   if (!treeSet.length) treeSet = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-  const treeKind = (t) => (t[3] >= 100 ? t[3] - 100 : treeSet[(Math.abs(Math.round(t[0] * 7 + t[1] * 13)) + t[3]) % treeSet.length]);   // 這棵樹是圖鑑裡的哪一種
+  // 一片一種：同一座山是同一種樹，大馬路的行道樹是一種、街道的行道樹是另一種，每塊草地各一種，其餘零星的樹依所在的街區分
+  const treeZone = (t) => {
+    if (t[4]) { const i = D.wood.findIndex((r) => inside({ x: t[0], y: t[1] }, r[0])); return 40 + (i < 0 ? 0 : i) * 5; }
+    let big = 1e9, mid = 1e9;
+    ((D.flows || {}).car || []).forEach((l) => {
+      if (l[0] < 1.4) return;
+      const q = l[1];
+      for (let i = 0; i + 3 < q.length; i += 2) {
+        const dx = q[i + 2] - q[i], dy = q[i + 3] - q[i + 1], k = Math.max(0, Math.min(1, ((t[0] - q[i]) * dx + (t[1] - q[i + 1]) * dy) / (dx * dx + dy * dy || 1))), d = Math.hypot(t[0] - q[i] - dx * k, t[1] - q[i + 1] - dy * k);
+        if (l[0] >= 2.4) big = Math.min(big, d); else mid = Math.min(mid, d);
+      }
+    });
+    if (big < 24) return 3;
+    if (mid < 13) return 7;
+    const lawn = D.lawn.findIndex((r) => inside({ x: t[0], y: t[1] }, r[0]));
+    if (lawn >= 0) return 11 + lawn * 3;
+    return 5 + Math.floor((t[0] + 2000) / 130) * 7 + Math.floor((t[1] + 2000) / 130) * 13;
+  };
+  const treeKind = (t) => (t[3] >= 100 ? t[3] - 100 : treeSet[treeZone(t) % treeSet.length]);   // 這棵樹是圖鑑裡的哪一種（手動指定的優先）
   let treeTool = '', treeShown = { flat: [], hill: [] };                        // treeTool：'' 沒在用、'add' 種樹、'cut' 移除
   function treeList() {
     const gone = (t) => TREES.cut.some((c) => Math.abs(c[0] - t[0]) < 0.6 && Math.abs(c[1] - t[1]) < 0.6);
@@ -48,6 +66,8 @@
     });
     return (treeShown = { flat, hill });
   }
+  let peopleStyle = STYLE.people === 'water' ? 'water' : 'crayon';               // 人物畫法：crayon 蠟筆插畫、water 水彩剪影
+  if (EDIT) { try { const v = localStorage.getItem(STORE + '-people'); if (v) peopleStyle = v; } catch (e) { /* 用檔案裡的 */ } }
   let wc = STYLE.watercolor !== false;                                           // 水彩濾鏡：畫面邊緣微微暈開，疊一層紙的斑駁
   if (EDIT) { try { const v = localStorage.getItem(STORE + '-wc'); if (v) wc = v === '1'; } catch (e) { /* 用檔案裡的 */ } }
   function derive() {                                                           // 由主色推出深淺變化
@@ -796,7 +816,7 @@
     return grp;
   }
   // 小人：蠟筆畫的人，有頭髮、上衣、褲子或裙子。8 × 3 共 24 種；其中一格是小孩、一格是狗
-  function texPeople() {
+  function texPeopleCrayon() {
     const CW = 96, CH = 128;
     const SKIN = ['#f2c9a8', '#e8b08a', '#c98d62', '#8d5a3b', '#f6d7c0'], HAIR = ['#2b2622', '#6b4a2e', '#c9742e', '#d9b25a', '#9a9a9a', '#b5412c'];
     const TOP = ['#2f2c2c', '#b9b3ab', '#6f7f4a', '#3f8f86', '#c8a13a', '#e9a7b4', '#9db7dc', '#8a5a3a', '#f4f1e8', '#d8553a', '#5f6fb0', '#c98f6a'];
@@ -837,6 +857,62 @@
     t.anisotropy = 4;
     return t;
   }
+  // 小人的另一種畫法：水彩筆觸的剪影。八種正在做事的姿勢（走路、提菜、講電話、騎車、推菜籃車、撐傘、牽小孩、遛狗）× 三排顏色
+  const PEOPLE_HUE = ['#7d4a3a', '#b06a2c', '#6f6a66', '#8c3b3f', '#8a7a35', '#5d4b70', '#a3543a', '#4f6150', '#c08a4a', '#93505c', '#3f4a5a', '#9a6b4f', '#b5503c', '#6b5a48', '#77803f', '#a56a7a', '#4a5f6e', '#c79a5a', '#8a4f33', '#5a4a44', '#9c7b3a', '#7a3f4f', '#55664f', '#b9794e'];
+  function texPeopleWater() {
+    const CW = 96, CH = 128;
+    const figure = (g, i) => {
+      g.fillStyle = g.strokeStyle = '#000'; g.lineCap = g.lineJoin = 'round';
+      const L = (wd, ...pts) => { g.lineWidth = wd * 1.28; g.beginPath(); pts.forEach((q, n) => (n ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]))); g.stroke(); };
+      const dot = (x, y, r) => { g.beginPath(); g.arc(x, y, r * 1.08, 0, Math.PI * 2); g.fill(); };
+      const walker = (d, arms) => {
+        dot(50 + d, 15, 8.5); L(15, [49 + d, 33], [47 + d, 66]);
+        L(8, [47 + d, 66], [56 + d, 94], [60 + d, 121]); L(8, [47 + d, 66], [38 + d, 94], [28 + d, 119]);
+        L(6, [60 + d, 122], [67 + d, 122]); L(6, [28 + d, 120], [35 + d, 123]);
+        if (arms) { L(6, [49 + d, 35], [40 + d, 52], [34 + d, 64]); L(6, [49 + d, 35], [57 + d, 52], [63 + d, 62]); }
+      };
+      const stand = (d, top) => { dot(48 + d, top, 8.5); L(15, [48 + d, top + 18], [48 + d, top + 52]); L(8, [48 + d, top + 52], [44 + d, 122]); L(8, [48 + d, top + 52], [53 + d, 122]); };
+      [
+        () => walker(0, true),
+        () => { walker(0, true); g.fillRect(24, 64, 16, 19); g.fillRect(56, 62, 15, 18); },
+        () => { stand(0, 15); L(6, [48, 35], [60, 48], [55, 24]); L(6, [48, 35], [40, 54], [41, 70]); },
+        () => {
+          g.lineWidth = 3.6; [22, 74].forEach((x) => { g.beginPath(); g.arc(x, 105, 16, 0, Math.PI * 2); g.stroke(); });
+          L(3, [22, 105], [40, 84], [62, 84], [74, 105]); L(3, [40, 84], [48, 105], [62, 84]); L(3, [40, 84], [38, 74]); L(3, [62, 84], [64, 70], [71, 68]);
+          dot(61, 29, 8.5); L(13, [38, 70], [54, 45]); L(5.5, [54, 47], [62, 60], [69, 68]); L(7, [38, 70], [53, 87], [48, 104]); L(7, [38, 70], [46, 86], [40, 98]);
+        },
+        () => {
+          dot(35, 17, 8.5); L(15, [33, 35], [29, 68]); L(8, [29, 68], [37, 96], [39, 121]); L(8, [29, 68], [21, 96], [11, 119]); L(6, [39, 122], [46, 122]); L(6, [11, 120], [18, 123]);
+          L(6, [33, 38], [47, 52], [59, 56]); L(3, [59, 56], [63, 70]); g.fillRect(61, 66, 28, 27); L(3, [65, 92], [65, 112]); L(3, [85, 92], [85, 112]); dot(65, 117, 5); dot(85, 117, 5);
+        },
+        () => {
+          stand(-2, 32); g.beginPath(); g.ellipse(54, 18, 36, 14, 0, Math.PI, 0); g.closePath(); g.fill();
+          L(2.6, [56, 18], [56, 54]); L(6, [46, 52], [53, 62], [56, 52]); L(6, [46, 52], [38, 68], [39, 84]);
+        },
+        () => {
+          walker(-12, false); L(6, [37, 35], [28, 52], [22, 64]); L(5.5, [37, 35], [50, 56], [62, 74]);
+          dot(73, 64, 6.5); L(11, [73, 78], [73, 98]); L(6, [73, 98], [69, 122]); L(6, [73, 98], [78, 122]); L(4.5, [73, 80], [62, 74]);
+        },
+        () => {
+          walker(-16, false); L(6, [33, 35], [24, 52], [18, 64]); L(6, [33, 35], [42, 52], [48, 62]);
+          L(2.2, [48, 62], [72, 102]); L(9, [68, 108], [85, 108]); dot(89, 101, 5.5); L(3, [69, 108], [68, 122]); L(3, [84, 108], [85, 122]); L(3, [67, 106], [60, 98]);
+        },
+      ][i]();
+    };
+    const t = new T.CanvasTexture(sheet(CW * 8, CH * 3, (g) => {
+      for (let row = 0; row < 3; row++) for (let i = 0; i < 8; i++) {
+        g.drawImage(sheet(CW, CH, (c) => {
+          figure(c, i);
+          c.globalCompositeOperation = 'source-in'; c.fillStyle = PEOPLE_HUE[row * 8 + i]; c.fillRect(0, 0, CW, CH);
+          watery(c, CW, CH);
+        }), i * CW, row * CH);
+      }
+    }));
+    t.anisotropy = 4;
+    return t;
+  }
+  const texPeople = () => (peopleStyle === 'water' ? texPeopleWater() : texPeopleCrayon());
+
   // 車：蠟筆畫的側面。六格：橘車、杏色車、橘色機車（事件用），藍車、薄荷綠車、粉紅車（改善後用）
   function texCars() {
     const CW = 192, CH = 128, TONE = ['#f08a3c', '#f4b26a', '#f08a3c', '#6f9fd8', '#8fcdb4', '#f0a7bd'];
@@ -1263,7 +1339,7 @@
     // 調色
     if (!EDIT) return;                                                         // 發布出去的網站到這裡為止，沒有調色與輸出的介面
     panel.insertAdjacentHTML('beforeend', '<div id="set-edit"><h2>輸出</h2><button id="atlas-render" title="把現在的角度存成 PNG；按住 Shift 再按，背景透明">Render 存成 PNG</button>' +
-      '<p class="set-tip">存的是現在畫面的角度。按住 Shift 再按，背景是透明的。</p><h2>畫面</h2><button id="set-wc"></button><h2>樹</h2><div id="set-tree" class="set-pick"><button data-tool="add">種樹</button><button data-tool="cut">移除樹</button></div>' +
+      '<p class="set-tip">存的是現在畫面的角度。按住 Shift 再按，背景是透明的。</p><h2>畫面</h2><button id="set-wc"></button><button id="set-people"></button><h2>樹</h2><div id="set-tree" class="set-pick"><button data-tool="add">種樹</button><button data-tool="cut">移除樹</button></div>' +
       '<p class="set-tip" id="set-tree-tip"></p><div id="set-tree-lib"></div><p class="set-tip">樹的圖鑑：亮著的是地圖上會出現的種類，點一下開或關。按了「種樹」之後再點其中一種，就只種那一種（再點一次回到隨機）。</p><button id="set-tree-copy">複製 trees.js 的內容</button><textarea id="set-tree-out" rows="3" readonly></textarea><button id="set-tree-reset">回到檔案裡的樹</button><h2>山的圖案</h2><div id="set-hill" class="set-pick"></div><h2>顏色</h2><div id="set-colors"></div><button id="set-reset">回到檔案裡的顏色</button>' +
       '<p class="set-tip">這一區只有在自己電腦上預覽時才會出現。調好之後跟 Claude 說「存顏色」，或按下面的按鈕複製，貼到 data/style.js 蓋掉原本的內容再上傳。</p>' +
       '<button id="set-copy">複製 style.js 的內容</button><textarea id="set-out" rows="5" readonly></textarea></div>');
@@ -1271,7 +1347,7 @@
     document.getElementById('atlas-render').addEventListener('click', (e) => shot(e.shiftKey));
     const text = () => {
       const lines = PALETTE.concat([['slab', '底座側邊'], ['pier', '橋墩']]).map(([k, label]) => "    " + k + ": '" + C[k] + "',".padEnd(22) + '// ' + label);
-      return '// 網站的顏色與天氣。由頁面上的調色面板產生。時間不用設定，網站會跟著看的人當下的時刻走。\nwindow.ATLAS_STYLE = {\n  palette: {\n' + lines.join('\n') + '\n  },\n  trees: [' + treeSet.join(', ') + '],\n  watercolor: ' + wc + ',\n  hillPattern: \'' + hillKind + '\',\n  weather: \'' + sky.weather + '\',\n};\n';
+      return '// 網站的顏色與天氣。由頁面上的調色面板產生。時間不用設定，網站會跟著看的人當下的時刻走。\nwindow.ATLAS_STYLE = {\n  palette: {\n' + lines.join('\n') + '\n  },\n  people: \'' + peopleStyle + '\',\n  trees: [' + treeSet.join(', ') + '],\n  watercolor: ' + wc + ',\n  hillPattern: \'' + hillKind + '\',\n  weather: \'' + sky.weather + '\',\n};\n';
     };
     let wait = null;
     const inputs = {}, store = () => {
@@ -1289,6 +1365,9 @@
     const wcBtn = document.getElementById('set-wc'), wcShow = () => { wcBtn.textContent = '水彩濾鏡：' + (wc ? '開' : '關'); stage.classList.toggle('wc', wc); };
     wcBtn.addEventListener('click', () => { wc = !wc; try { localStorage.setItem(STORE + '-wc', wc ? '1' : '0'); } catch (e) { /* 只留在這一次 */ } wcShow(); out.value = text(); });
     wcShow();
+    const ppBtn = document.getElementById('set-people'), ppShow = () => { ppBtn.textContent = '人物：' + (peopleStyle === 'water' ? '水彩' : '插畫（蠟筆）'); };
+    ppBtn.addEventListener('click', () => { peopleStyle = peopleStyle === 'water' ? 'crayon' : 'water'; try { localStorage.setItem(STORE + '-people', peopleStyle); } catch (e) { /* 只留在這一次 */ } ppShow(); out.value = text(); build(); });
+    ppShow();
     const treeOut = document.getElementById('set-tree-out'), treeTip = document.getElementById('set-tree-tip'), treeBtns = [...document.getElementById('set-tree').children];
     treeSaved = () => {
       treeOut.value = '// 手動加的樹（add：x, y, 大小, 顏色 0–5）和移掉的樹（cut：x, y）。由頁面上的種樹工具產生。\nwindow.ATLAS_TREES = ' + JSON.stringify(TREES) + ';\n';
